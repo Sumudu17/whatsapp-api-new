@@ -55,6 +55,7 @@
     "@types/express-session": "^1.18.0",
     "@types/node": "^20.16.2",
     "@types/node-fetch": "^2.5.12",
+    "@types/nodemailer": "^7.0.9",
     "@types/pino": "^7.0.5",
     "@types/qrcode": "^1.5.5",
     "chai": "^4.3.4",
