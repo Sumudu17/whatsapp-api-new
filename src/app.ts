@@ -40,13 +40,62 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
   app.use(sessionMiddleware);
 
   const frontendPath = path.resolve(process.cwd(), "frontend");
-  app.use(express.static(frontendPath));
+  
+  // Serve static files, but exclude index.html (it will be served via route)
+  app.use(express.static(frontendPath, {
+    index: false, // Don't serve index.html automatically
+  }));
+
+  // Protect all routes except login and public assets
+  app.use((req, res, next) => {
+    // Allow login page, auth API, health, version, and static assets
+    if (
+      req.path === "/login" ||
+      req.path.startsWith("/api/auth/login") ||
+      req.path === "/api/health" ||
+      req.path === "/api/version" ||
+      req.path.startsWith("/styles.css") ||
+      req.path.startsWith("/app.js") ||
+      req.path.startsWith("/favicon.svg") ||
+      req.path.startsWith("/socket.io/")
+    ) {
+      return next();
+    }
+
+    // For API routes, check if API_AUTH_REQUIRED is enabled
+    if (req.path.startsWith("/api/")) {
+      const apiAuthRequired = (process.env.API_AUTH_REQUIRED ?? "false").toLowerCase() === "true";
+      if (apiAuthRequired) {
+        const sessionData: any = (req as any).session;
+        if (!sessionData?.user) {
+          return res.status(401).json({ success: false, error: "Unauthorized" });
+        }
+      }
+      return next();
+    }
+
+    // For non-API routes (like /, /index.html), always require authentication
+    const sessionData: any = (req as any).session;
+    if (!sessionData?.user) {
+      return res.redirect("/login");
+    }
+    return next();
+  });
 
   app.get("/login", (_req, res) => {
     res.sendFile(path.join(frontendPath, "login.html"));
   });
 
   app.get("/", (req, res) => {
+    const sessionData: any = (req as any).session;
+    if (!sessionData?.user) {
+      return res.redirect("/login");
+    }
+    return res.sendFile(path.join(frontendPath, "index.html"));
+  });
+
+  // Also protect direct access to index.html
+  app.get("/index.html", (req, res) => {
     const sessionData: any = (req as any).session;
     if (!sessionData?.user) {
       return res.redirect("/login");
