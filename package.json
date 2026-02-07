@@ -36,7 +36,7 @@
   "dependencies": {
     "@pedroslopez/moduleraid": "^5.0.2",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "express": "^5.2.1",
     "express-rate-limit": "^7.4.1",
     "express-session": "^1.18.1",
     "fluent-ffmpeg": "2.1.3",
