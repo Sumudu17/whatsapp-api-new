@@ -1,0 +1,20 @@
+[Unit]
+Description=WA API on port 3004
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/WA-API-V2
+EnvironmentFile=/home/ubuntu/WA-API-V2/.env
+Environment=PORT=3004
+Environment=NODE_ENV=production
+Environment=HOME=/home/ubuntu
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

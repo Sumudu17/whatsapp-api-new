@@ -1,6 +1,7 @@
 const statusText = document.getElementById("statusText");
 const clientStateText = document.getElementById("clientStateText");
 const serverStatus = document.getElementById("serverStatus");
+const versionText = document.getElementById("versionText");
 const qrImage = document.getElementById("qrImage");
 const qrHint = document.getElementById("qrHint");
 const initBtn = document.getElementById("initBtn");
@@ -168,5 +169,17 @@ destRadios.forEach((radio) => {
     }
   });
 });
+
+// Load version on page load
+(async () => {
+  try {
+    const data = await request("/api/version");
+    if (data.version) {
+      versionText.textContent = `v${data.version}`;
+    }
+  } catch (err) {
+    console.warn("Failed to load version:", err);
+  }
+})();
 
 // Status updates are pushed via websocket (state_change).

@@ -68,6 +68,11 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
     });
   });
 
+  app.get("/api/version", (_req, res) => {
+    const pkg = require("../package.json");
+    res.json({ version: pkg.version });
+  });
+
   app.use("/api/auth", authRoutes);
   app.use("/api/alerts", alertsRoutes);
   app.use("/api/whatsapp", whatsappRoutes);
