@@ -64,6 +64,9 @@ typings/
 # next.js build output
 .next
 
+# TypeScript build output
+dist/
+
 # macOS
 ._*
 .DS_Store
@@ -78,3 +81,7 @@ typings/
 # IDE's
 .idea
 .vscode
+
+
+*.env.example text eol=lf
+*.env text eol=lf

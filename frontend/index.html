@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp Web Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>WhatsApp Web Dashboard</h1>
+        <button id="appLogoutBtn" class="secondary">App Logout</button>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Connection</h2>
+          <p id="serverStatus" class="status-note hidden">
+            Server offline. Start the backend to reconnect.
+          </p>
+          <p>Status: <span id="statusText">NOT_INITIALIZED</span></p>
+          <p>Client State: <span id="clientStateText">-</span></p>
+          <div class="button-row">
+            <button id="initBtn">Initialize</button>
+            <button id="waLogoutBtn" class="danger">Logout WhatsApp</button>
+          </div>
+          <div class="qr-box">
+            <img id="qrImage" alt="QR Code" />
+            <p id="qrHint">QR will appear here when required.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Send Message</h2>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="destType" value="individual" checked />
+              Individual
+            </label>
+            <label>
+              <input type="radio" name="destType" value="group" />
+              Group
+            </label>
+          </div>
+
+          <div id="individualSection">
+            <label>
+              To (E.164)
+              <input type="text" id="toInput" placeholder="+94717177326" />
+            </label>
+          </div>
+
+          <div id="groupSection" class="hidden">
+            <label>
+              Group
+              <select id="groupSelect">
+                <option value="">Select group</option>
+              </select>
+            </label>
+            <button id="refreshGroupsBtn" class="secondary small">
+              Refresh Groups
+            </button>
+          </div>
+
+          <label>
+            Message
+            <textarea id="messageInput" rows="4"></textarea>
+          </label>
+          <button id="sendBtn">Send Message</button>
+          <p id="sendResult" class="info hidden"></p>
+        </div>
+      </section>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

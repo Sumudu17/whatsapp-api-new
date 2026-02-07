@@ -13,6 +13,98 @@
     <br />
 </div>
 
+## WhatsApp Web Automation App
+This workspace includes a full WhatsApp Web application using **whatsapp-web.js**, with a Node.js backend, WebSocket updates, and a simple frontend UI.
+
+### Prerequisites
+- Node.js 18+
+
+### Setup
+1. Install dependencies:
+   - `npm install`
+2. Create your `.env`:
+   - `copy .env.example .env` (Windows PowerShell)
+3. Set credentials and config in `.env`:
+   - `APP_USERNAME` / `APP_PASSWORD`
+   - `DEFAULT_TO` (optional default recipient)
+   - `WWEBJS_CLIENT_ID` (optional, defaults to `api`)
+   - `WWEBJS_AUTH_PATH` (optional custom auth path)
+   - `AUTO_INIT` (optional, defaults to `true`)
+   - `API_AUTH_REQUIRED` (optional, defaults to `false`)
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+   - `SMTP_FROM` (optional, defaults to `SMTP_USER`)
+   - `ALERT_EMAIL_TO` (required for alerts)
+
+### Run
+- Dev server: `npm run dev`
+- Production build: `npm run build`
+- Start: `npm start`
+
+### Web UI
+- Visit `http://localhost:4000/login`
+- Login with `APP_USERNAME` / `APP_PASSWORD`
+- QR appears on the dashboard when required
+
+### API Endpoints
+- `GET /api/health`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `POST /api/whatsapp/initialize`
+- `POST /api/whatsapp/reinitialize`
+- `POST /api/whatsapp/logout`
+- `GET /api/whatsapp/status`
+- `GET /api/whatsapp/groups`
+- `POST /api/whatsapp/send`
+
+Send payload:
+```
+{
+  "to": "+94717177326",
+  "groupId": "12345@g.us",
+  "message": "Hello World"
+}
+```
+Rules: either `to` or `groupId` is required (not both).
+
+### WebSocket Events
+- `qr`
+- `ready`
+- `authenticated`
+- `disconnected`
+- `state_change`
+
+### Email Alerts
+- If WhatsApp status is not `READY` for more than 5 minutes, an alert email is sent.
+- Check delivery status with: `GET /api/alerts/status`
+- Trigger a test email with: `POST /api/alerts/test`
+
+### Curl examples
+```
+curl http://localhost:4000/api/health
+```
+```
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"admin\",\"password\":\"change_me\"}"
+```
+```
+curl -X POST http://localhost:4000/api/whatsapp/send \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":\"+94717177326\",\"message\":\"Test message\"}"
+```
+```
+curl -X POST http://localhost:4000/api/alerts/test \
+  -H "Content-Type: application/json" \
+  -d "{\"subject\":\"Test alert\",\"text\":\"Email check\"}"
+```
+```
+curl http://localhost:4000/api/alerts/status
+```
+
+### Notes & limitations
+- WhatsApp Web automation can lead to bans; use carefully.
+- QR must be scanned from the web UI to authenticate.
+
 ## About
 **A WhatsApp API client that operates via the WhatsApp Web browser.**
 
