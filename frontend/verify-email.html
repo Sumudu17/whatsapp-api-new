@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp Web - Verify Email</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Verify Email</h1>
+      <form id="verifyForm" class="card">
+        <p id="emailHint" class="info hidden"></p>
+        <label>
+          OTP Code
+          <input type="text" id="otp" required maxlength="6" />
+        </label>
+        <button type="submit">Verify</button>
+        <button id="resendBtn" class="secondary" type="button" style="margin-left: 8px;">
+          Resend OTP
+        </button>
+        <p id="verifyError" class="error hidden"></p>
+        <p id="verifySuccess" class="info hidden"></p>
+      </form>
+    </div>
+
+    <script>
+      const url = new URL(window.location.href);
+      const email = url.searchParams.get("email");
+
+      const emailHint = document.getElementById("emailHint");
+      const verifyForm = document.getElementById("verifyForm");
+      const errorEl = document.getElementById("verifyError");
+      const successEl = document.getElementById("verifySuccess");
+      const otpInput = document.getElementById("otp");
+      const resendBtn = document.getElementById("resendBtn");
+
+      if (!email) {
+        errorEl.textContent = "Missing email in URL.";
+        errorEl.classList.remove("hidden");
+        verifyForm.querySelector("button[type='submit']").disabled = true;
+        resendBtn.disabled = true;
+      } else {
+        emailHint.textContent = `Enter the OTP sent to: ${email}`;
+        emailHint.classList.remove("hidden");
+      }
+
+      const setError = (msg) => {
+        errorEl.textContent = msg;
+        errorEl.classList.remove("hidden");
+      };
+
+      const setSuccess = (msg) => {
+        successEl.textContent = msg;
+        successEl.classList.remove("hidden");
+      };
+
+      verifyForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorEl.classList.add("hidden");
+        successEl.classList.add("hidden");
+
+        const otp = otpInput.value.trim();
+        const res = await fetch("/api/auth/verify-email-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, otp }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "OTP verification failed");
+          return;
+        }
+
+        window.location.href = "/login";
+      });
+
+      resendBtn.addEventListener("click", async () => {
+        errorEl.classList.add("hidden");
+        successEl.classList.add("hidden");
+
+        const res = await fetch("/api/auth/resend-email-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "Failed to resend OTP");
+          return;
+        }
+        setSuccess("A new OTP has been sent.");
+      });
+    </script>
+  </body>
+</html>
+

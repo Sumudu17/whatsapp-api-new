@@ -33,7 +33,12 @@ export const initSockets = (
   });
 
   io.on("connection", (socket) => {
-    socket.emit("state_change", getState());
+    const sessionUser: any = (socket.request as any)?.session?.user;
+    const userId = sessionUser?.userId;
+    if (userId) {
+      socket.join(`user:${userId}`);
+      socket.emit("state_change", getState(userId));
+    }
   });
 
   return io;

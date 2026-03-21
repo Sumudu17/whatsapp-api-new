@@ -2,10 +2,12 @@ import dotenv from "dotenv";
 import http from "http";
 import session from "express-session";
 import { createApp } from "./app";
-import { initializeWhatsApp } from "./services/whatsapp.service";
 import { initSockets } from "./sockets";
 import { startWhatsAppMonitor } from "./whatsapp/monitor";
 import { logger } from "./utils/logger";
+import { runMigrations } from "./db/migrator";
+import { initializeWhatsApp } from "./services/whatsapp.service";
+import { listActiveUsersForAutoInit } from "./db/whatsapp.repo";
 
 dotenv.config();
 
@@ -22,13 +24,44 @@ const app = createApp(sessionMiddleware);
 const server = http.createServer(app);
 initSockets(server, sessionMiddleware);
 
-server.listen(port, () => {
+server.listen(port, async () => {
   logger.info({ port }, "Server listening");
+
+  try {
+    await runMigrations();
+  } catch (err) {
+    logger.warn({ err }, "MySQL migrations failed");
+  }
+
   const autoInit = (process.env.AUTO_INIT ?? "true").toLowerCase() === "true";
   if (autoInit) {
-    initializeWhatsApp(false).catch((err) => {
-      logger.warn({ err }, "WhatsApp auto-initialize failed");
-    });
+    const maxAutoInit = process.env.AUTO_INIT_MAX_WHATSAPP_CLIENTS
+      ? Number(process.env.AUTO_INIT_MAX_WHATSAPP_CLIENTS)
+      : Number(process.env.MAX_ACTIVE_WHATSAPP_CLIENTS || "5");
+
+    try {
+      const userIds = await listActiveUsersForAutoInit({ limit: maxAutoInit });
+
+      logger.info(
+        { count: userIds.length, maxAutoInit },
+        "Auto-initializing WhatsApp clients for active users"
+      );
+
+      for (let i = 0; i < userIds.length; i++) {
+        const userId = userIds[i];
+        // Stagger to reduce load spikes.
+        // eslint-disable-next-line no-await-in-loop
+        await initializeWhatsApp(userId, false, false).catch((err) => {
+          logger.warn({ err, userId }, "Auto-init failed for userId");
+        });
+        // eslint-disable-next-line no-await-in-loop
+        if (i < userIds.length - 1) {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, "Auto-init from DB failed");
+    }
   } else {
     logger.info("WhatsApp auto-initialize disabled");
   }

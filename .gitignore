@@ -73,10 +73,12 @@ dist/
 
 # Test sessions
 *session.json
-.wwebjs_auth/
 
-# local version cache
+# WhatsApp Web.js (LocalAuth sessions + browser cache)
+.wwebjs_auth/
 .wwebjs_cache/
+/cache/
+/cash/
 
 # IDE's
 .idea

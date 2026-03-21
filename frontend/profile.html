@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp Web - Profile</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div>
+          <h1>Profile</h1>
+          <span id="versionText" class="version-badge">v1.0.0</span>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="backBtn" class="secondary">Back</button>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Account</h2>
+          <p><strong>Name:</strong> <span id="meName">-</span></p>
+          <p><strong>Email:</strong> <span id="meEmail">-</span></p>
+          <p><strong>Status:</strong> <span id="meActive">-</span></p>
+
+          <hr style="border:0; border-top:1px solid #eee; margin:16px 0;" />
+
+          <h3 style="margin-top:0;">Change Name</h3>
+          <label>
+            New Name
+            <input type="text" id="nameInput" />
+          </label>
+          <button id="changeNameBtn" class="secondary small">Save Name</button>
+          <p id="nameError" class="error hidden"></p>
+          <p id="nameSuccess" class="info hidden"></p>
+        </div>
+
+        <div class="card">
+          <h2>Email Verification</h2>
+          <h3 style="margin-top:0;">Change Email</h3>
+          <label>
+            New Email
+            <input type="email" id="newEmailInput" />
+          </label>
+          <button id="requestEmailOtpBtn" class="secondary small">Request OTP</button>
+
+          <div id="emailOtpSection" class="hidden" style="margin-top:16px;">
+            <label>
+              OTP Code
+              <input type="text" id="emailOtpInput" maxlength="6" />
+            </label>
+            <button id="verifyEmailOtpBtn" class="secondary small">Verify & Save Email</button>
+          </div>
+
+          <p id="emailOtpError" class="error hidden"></p>
+          <p id="emailOtpSuccess" class="info hidden"></p>
+        </div>
+
+        <div class="card">
+          <h2>Security</h2>
+          <h3 style="margin-top:0;">Change Password</h3>
+          <label>
+            Current Password
+            <input type="password" id="currentPasswordInput" />
+          </label>
+          <label>
+            New Password
+            <input type="password" id="newPasswordInput" />
+          </label>
+          <button id="changePasswordBtn" class="danger small">Update Password</button>
+          <p id="passwordError" class="error hidden"></p>
+          <p id="passwordSuccess" class="info hidden"></p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const request = async (url, options = {}) => {
+        const res = await fetch(url, {
+          ...options,
+          cache: "no-store",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Request failed");
+        }
+        return data;
+      };
+
+      const backBtn = document.getElementById("backBtn");
+      backBtn.addEventListener("click", () => {
+        window.location.href = "/";
+      });
+
+      const setError = (id, msg) => {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.classList.remove("hidden");
+      };
+
+      const setSuccess = (id, msg) => {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.classList.remove("hidden");
+      };
+
+      const clearMessages = (...ids) => {
+        ids.forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add("hidden");
+        });
+      };
+
+      const loadMe = async () => {
+        const data = await request("/api/auth/me", { method: "GET" });
+        document.getElementById("meName").textContent = data.user?.name || "-";
+        document.getElementById("meEmail").textContent = data.user?.email || "-";
+        document.getElementById("meActive").textContent =
+          data.user?.is_active ? "ACTIVE" : "NOT_ACTIVE";
+      };
+
+      (async () => {
+        try {
+          const v = await request("/api/version", { method: "GET" });
+          if (v?.version) {
+            document.getElementById("versionText").textContent = `v${v.version}`;
+          }
+        } catch (_) {}
+
+        try {
+          await loadMe();
+        } catch (err) {
+          alert(err.message);
+        }
+      })();
+
+      document.getElementById("changeNameBtn").addEventListener("click", async () => {
+        clearMessages("nameError", "nameSuccess");
+        try {
+          const name = document.getElementById("nameInput").value.trim();
+          await request("/api/auth/change-name", {
+            method: "POST",
+            body: JSON.stringify({ name }),
+          });
+          setSuccess("nameSuccess", "Name updated.");
+          await loadMe();
+        } catch (err) {
+          setError("nameError", err.message);
+        }
+      });
+
+      document.getElementById("requestEmailOtpBtn").addEventListener("click", async () => {
+        clearMessages("emailOtpError", "emailOtpSuccess");
+        try {
+          const newEmail = document.getElementById("newEmailInput").value.trim();
+          await request("/api/auth/change-email/request-otp", {
+            method: "POST",
+            body: JSON.stringify({ newEmail }),
+          });
+          document.getElementById("emailOtpSection").classList.remove("hidden");
+          setSuccess("emailOtpSuccess", "OTP sent to your new email.");
+        } catch (err) {
+          setError("emailOtpError", err.message);
+        }
+      });
+
+      document.getElementById("verifyEmailOtpBtn").addEventListener("click", async () => {
+        clearMessages("emailOtpError", "emailOtpSuccess");
+        try {
+          const otp = document.getElementById("emailOtpInput").value.trim();
+          const newEmail = document.getElementById("newEmailInput").value.trim();
+          await request("/api/auth/change-email/verify-otp", {
+            method: "POST",
+            body: JSON.stringify({ newEmail, otp }),
+          });
+          setSuccess("emailOtpSuccess", "Email updated. Please log in again.");
+          // For security: user may have changed email; session stays but best UX is logout.
+          await request("/api/auth/logout", { method: "POST" });
+          window.location.href = "/login";
+        } catch (err) {
+          setError("emailOtpError", err.message);
+        }
+      });
+
+      document.getElementById("changePasswordBtn").addEventListener("click", async () => {
+        clearMessages("passwordError", "passwordSuccess");
+        try {
+          const currentPassword = document.getElementById("currentPasswordInput").value;
+          const newPassword = document.getElementById("newPasswordInput").value;
+          await request("/api/auth/change-password", {
+            method: "POST",
+            body: JSON.stringify({ currentPassword, newPassword }),
+          });
+          setSuccess("passwordSuccess", "Password updated.");
+          document.getElementById("currentPasswordInput").value = "";
+          document.getElementById("newPasswordInput").value = "";
+        } catch (err) {
+          setError("passwordError", err.message);
+        }
+      });
+    </script>
+  </body>
+</html>
+

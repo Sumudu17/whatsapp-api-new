@@ -41,7 +41,7 @@ sudo apt-get install -y ca-certificates fonts-liberation libappindicator3-1 liba
 2. Create your `.env`:
    - `copy .env.example .env` (Windows PowerShell)
 3. Set credentials and config in `.env`:
-   - `APP_USERNAME` / `APP_PASSWORD`
+   - `SESSION_SECRET` (optional; defaults to `dev_session_secret`)
    - `DEFAULT_TO` (optional default recipient)
    - `WWEBJS_CLIENT_ID` (optional, defaults to `api`)
    - `WWEBJS_AUTH_PATH` (optional custom auth path)
@@ -50,6 +50,10 @@ sudo apt-get install -y ca-certificates fonts-liberation libappindicator3-1 liba
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
    - `SMTP_FROM` (optional, defaults to `SMTP_USER`)
    - `ALERT_EMAIL_TO` (required for alerts)
+   - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB`
+   - `ADMIN_EMAIL` (admin notifications on disconnect)
+
+   - `OTP_PEPPER` (recommended), `OTP_EXPIRES_MINUTES`, `OTP_RESEND_MIN_SECONDS`, `OTP_MAX_INVALID_ATTEMPTS`
 
 ### Run
 - Dev server: `npm run dev`
@@ -58,29 +62,223 @@ sudo apt-get install -y ca-certificates fonts-liberation libappindicator3-1 liba
 
 ### Web UI
 - Visit `http://localhost:4000/login`
-- Login with `APP_USERNAME` / `APP_PASSWORD`
-- QR appears on the dashboard when required
+- Register at `http://localhost:4000/register`
+- Verify your email OTP at `http://localhost:4000/verify-email?email=...`
+- After login, open:
+  - `http://localhost:4000/` (dashboard)
+  - `http://localhost:4000/connection` (QR + connection status)
+  - `http://localhost:4000/api-keys` (API key management)
+  - `http://localhost:4000/profile` (name/email/password)
 
 ### API Endpoints
 - `GET /api/health`
-- `POST /api/auth/login`
+- `GET /api/version`
+- `POST /api/auth/register`
+- `POST /api/auth/verify-email-otp`
+- `POST /api/auth/resend-email-otp`
+- `POST /api/auth/login` (session cookie)
 - `POST /api/auth/logout`
-- `POST /api/whatsapp/initialize`
-- `POST /api/whatsapp/reinitialize`
-- `POST /api/whatsapp/logout`
-- `GET /api/whatsapp/status`
-- `GET /api/whatsapp/groups`
-- `POST /api/whatsapp/send`
+- `GET /api/auth/me` (session)
+- `POST /api/auth/change-name` (session)
+- `POST /api/auth/change-email/request-otp` (session)
+- `POST /api/auth/change-email/verify-otp` (session)
+- `POST /api/auth/change-password` (session)
 
-Send payload:
+- `GET /api/api-keys` (session)
+- `POST /api/api-keys` (session; returns raw key once)
+- `DELETE /api/api-keys/:id` (session)
+
+- `POST /api/whatsapp/initialize` (session; triggers QR via WebSocket)
+- `POST /api/whatsapp/logout` (session)
+- `GET /api/whatsapp/status` (session; current in-memory state)
+- `GET /api/whatsapp/connection` (session; state + last disconnect metadata from MySQL)
+- `GET /api/whatsapp/groups` (session; only when state is `READY`)
+
+- `POST /api/whatsapp/send` (session auth or API-key auth; routes through the correct WhatsApp session)
+
+### WhatsApp Send Payload (session auth)
+`POST /api/whatsapp/send`
+
+Rules: provide exactly one of `to` or `groupId`.
+
 ```
 {
   "to": "+94717177326",
+  "message": "Hello World"
+}
+```
+
+Example (group):
+
+```
+{
   "groupId": "12345@g.us",
   "message": "Hello World"
 }
 ```
-Rules: either `to` or `groupId` is required (not both).
+
+### WhatsApp Send Payload (API key auth)
+`POST /api/whatsapp/send`
+
+Rules: provide exactly one of `phoneNumber` or `groupId`.
+
+Request body:
+
+```
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "phoneNumber": "+94717177326",
+  "message": "Hello from external app"
+}
+```
+
+Response (success):
+
+```
+{
+  "success": true,
+  "messageId": "..."
+}
+```
+
+### Send WhatsApp Message (API examples)
+
+#### 1) Session auth (cookie) - `POST /api/whatsapp/send`
+
+Login (cookie stored in `cookies.txt`):
+
+```
+curl -c cookies.txt -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"example.user1@example.com\",\"password\":\"TestPass1234!\"}"
+```
+
+Send to a phone number:
+
+```
+curl -b cookies.txt -X POST http://localhost:4000/api/whatsapp/send \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":\"+94717177326\",\"message\":\"Hello from API (session)\"}"
+```
+
+Send to a group:
+
+```
+curl -b cookies.txt -X POST http://localhost:4000/api/whatsapp/send \
+  -H "Content-Type: application/json" \
+  -d "{\"groupId\":\"12345@g.us\",\"message\":\"Hello from API (session, group)\"}"
+```
+
+#### 2) API key auth - `POST /api/whatsapp/send`
+
+Send to a phone number:
+
+```
+curl -X POST http://localhost:4000/api/whatsapp/send \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":1,\"apiKey\":\"RAW_API_KEY_VALUE\",\"phoneNumber\":\"+94717177326\",\"message\":\"Hello from API (apikey)\"}"
+```
+
+Send to a group:
+
+```
+curl -X POST http://localhost:4000/api/whatsapp/send \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":1,\"apiKey\":\"RAW_API_KEY_VALUE\",\"groupId\":\"12345@g.us\",\"message\":\"Hello from API (apikey, group)\"}"
+```
+
+### Auth + OTP Payloads
+
+#### Register
+`POST /api/auth/register`
+
+Request:
+
+```
+{
+  "name": "Example User 1",
+  "email": "example.user1@example.com",
+  "password": "YourPassword123"
+}
+```
+
+Response: `{ "success": true }`
+
+#### Verify OTP
+`POST /api/auth/verify-email-otp`
+
+```
+{
+  "email": "example.user1@example.com",
+  "otp": "123456"
+}
+```
+
+#### Resend OTP
+`POST /api/auth/resend-email-otp`
+
+```
+{
+  "email": "example.user1@example.com"
+}
+```
+
+#### Login
+`POST /api/auth/login`
+
+```
+{
+  "email": "example.user1@example.com",
+  "password": "YourPassword123"
+}
+```
+
+Response: `{ "success": true }` (session cookie set by server)
+
+### API Keys Payloads
+
+#### List keys
+`GET /api/api-keys`
+
+Response:
+
+```
+{
+  "success": true,
+  "apiKeys": [
+    { "id": 1, "name": "My App", "key_prefix": "abc123...", "status": "ACTIVE", "created_at": "..." }
+  ]
+}
+```
+
+#### Create key (raw key returned once)
+`POST /api/api-keys`
+
+Request:
+
+```
+{ "name": "My App" }
+```
+
+Response:
+
+```
+{
+  "success": true,
+  "apiKey": {
+    "id": 1,
+    "name": "My App",
+    "key_prefix": "abc123...",
+    "rawKey": "RAW_API_KEY_VALUE"
+  }
+}
+```
+
+#### Delete key
+`DELETE /api/api-keys/:id`
+
+Response: `{ "success": true }`
 
 ### WebSocket Events
 - `qr`
@@ -101,12 +299,17 @@ curl http://localhost:4000/api/health
 ```
 curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"username\":\"admin\",\"password\":\"change_me\"}"
+  -d "{\"email\":\"example.user1@example.com\",\"password\":\"TestPass1234!\"}"
 ```
 ```
 curl -X POST http://localhost:4000/api/whatsapp/send \
   -H "Content-Type: application/json" \
   -d "{\"to\":\"+94717177326\",\"message\":\"Test message\"}"
+```
+```
+curl -X POST http://localhost:4000/api/whatsapp/send \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":1,\"apiKey\":\"RAW_API_KEY_VALUE\",\"phoneNumber\":\"+94717177326\",\"message\":\"Hello external\"}"
 ```
 ```
 curl -X POST http://localhost:4000/api/alerts/test \

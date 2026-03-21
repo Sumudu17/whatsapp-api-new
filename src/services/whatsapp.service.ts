@@ -1,11 +1,18 @@
 import { ApiError } from "../middlewares/error.middleware";
 import { getClient, initializeClient, destroyClient } from "../whatsapp/client";
 import { getState } from "../whatsapp/state";
+import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
+import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
 
-export const initializeWhatsApp = async (force = false, clearSession = false) => {
+export const initializeWhatsApp = async (
+  userId: number,
+  force = false,
+  clearSession = false
+) => {
   try {
-    await initializeClient(force, clearSession);
-    return getState();
+    await ensureWhatsappSessionRow({ userId, clientId: String(userId) });
+    await initializeClient(userId, force, clearSession);
+    return getState(userId);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Initialization failed";
     if (message.includes("WHATSAPP_SESSION_IN_USE")) {
@@ -24,22 +31,34 @@ export const initializeWhatsApp = async (force = false, clearSession = false) =>
   }
 };
 
-export const logoutWhatsApp = async () => {
-  await destroyClient(true);
-  return getState();
+export const logoutWhatsApp = async (userId: number) => {
+  await destroyClient(userId, true);
+  return getState(userId);
 };
 
-export const getWhatsAppStatus = () => {
-  return getState();
+export const getWhatsAppStatus = (userId: number) => {
+  return getState(userId);
 };
 
-export const getWhatsAppGroups = async () => {
-  const state = getState();
+export const getWhatsAppConnection = async (userId: number) => {
+  const state = getState(userId);
+  const session = await getWhatsappSessionByUserId(userId);
+  return {
+    ...state,
+    lastConnectedAt: session?.last_connected_at ?? null,
+    lastAuthenticatedAt: session?.last_authenticated_at ?? null,
+    lastDisconnectedAt: session?.last_disconnected_at ?? null,
+    lastDisconnectedReason: session?.last_disconnected_reason ?? null,
+  };
+};
+
+export const getWhatsAppGroups = async (userId: number) => {
+  const state = getState(userId);
   if (state.status !== "READY") {
     throw new ApiError(503, "WhatsApp client is not ready");
   }
 
-  const client = getClient();
+  const client = getClient(userId);
   const chats = await client.getChats();
   return chats
     .filter((chat: any) => chat.isGroup)
@@ -51,16 +70,17 @@ export const getWhatsAppGroups = async () => {
 };
 
 export const sendWhatsAppText = async (
+  userId: number,
   to: string | undefined,
   groupId: string | undefined,
   message: string
 ) => {
-  const state = getState();
+  const state = getState(userId);
   if (state.status !== "READY") {
     throw new ApiError(503, "WhatsApp client is not ready");
   }
 
-  const client = getClient();
+  const client = getClient(userId);
 
   if ((to && groupId) || (!to && !groupId)) {
     throw new ApiError(400, "Either to or groupId is required (not both)");

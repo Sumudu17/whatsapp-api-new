@@ -14,7 +14,7 @@
         "ecmaVersion": 2022
     },
     "plugins": ["mocha"],
-    "ignorePatterns": ["docs"],
+    "ignorePatterns": ["docs", "dist", "migrations", "node_modules", "example.js"],
     "rules": {
         "indent": [
             "error",

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Keys</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div>
+          <h1>API Keys</h1>
+          <span id="versionText" class="version-badge">v1.0.0</span>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="backBtn" class="secondary">Back</button>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Your Keys</h2>
+          <p>
+            <strong>Your userId:</strong>
+            <span id="userIdValue">-</span>
+          </p>
+          <div id="keysList" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+
+        <div class="card">
+          <h2>Create Key</h2>
+          <label>
+            App / Key Name
+            <input type="text" id="keyName" placeholder="e.g. my-external-app" />
+          </label>
+          <button id="createKeyBtn">Create API Key</button>
+          <p id="createKeyError" class="error hidden"></p>
+          <div id="rawKeyBox" class="info hidden" style="margin-top:12px;">
+            <div><strong>Copy this key:</strong></div>
+            <pre id="rawKeyText" style="white-space:pre-wrap; word-break:break-all; margin: 8px 0 0;"></pre>
+            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button id="copyRawKeyBtn" class="secondary small" type="button">Copy API Key</button>
+              <button id="copyExampleBtn" class="secondary small" type="button">Copy Example Payload</button>
+            </div>
+          </div>
+
+          <div id="apiDetailsBox" class="hidden" style="margin-top:16px;">
+            <h3 style="margin-top:0;">API Details</h3>
+            <p style="margin-top:0;">
+              Endpoint:
+              <code>/api/whatsapp/send</code>
+            </p>
+            <p>
+              Use either <code>phoneNumber</code> or <code>groupId</code> (xor).
+            </p>
+            <p style="margin-bottom:6px;">
+              Example request body:
+            </p>
+            <pre id="examplePayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const request = async (url, options = {}) => {
+        const res = await fetch(url, {
+          ...options,
+          cache: "no-store",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Request failed");
+        }
+        return data;
+      };
+
+      const backBtn = document.getElementById("backBtn");
+      backBtn.addEventListener("click", () => {
+        window.location.href = "/";
+      });
+
+      const keysList = document.getElementById("keysList");
+      const createKeyBtn = document.getElementById("createKeyBtn");
+      const keyNameInput = document.getElementById("keyName");
+      const createKeyError = document.getElementById("createKeyError");
+      const rawKeyBox = document.getElementById("rawKeyBox");
+      const rawKeyText = document.getElementById("rawKeyText");
+      const apiDetailsBox = document.getElementById("apiDetailsBox");
+      const examplePayloadText = document.getElementById("examplePayloadText");
+      const copyRawKeyBtn = document.getElementById("copyRawKeyBtn");
+      const copyExampleBtn = document.getElementById("copyExampleBtn");
+      const userIdValue = document.getElementById("userIdValue");
+
+      let currentUserId = null;
+      let lastCreatedRawKey = null;
+
+      const copyToClipboard = async (text) => {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (err) {
+          // Fallback for older browsers.
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+          return true;
+        }
+      };
+
+      const renderKeys = (keys) => {
+        keysList.innerHTML = "";
+        if (!keys || keys.length === 0) {
+          keysList.innerHTML = "<p>No API keys yet.</p>";
+          return;
+        }
+
+        keys.forEach((k) => {
+          const row = document.createElement("div");
+          row.className = "card";
+          row.style.boxShadow = "none";
+          row.style.padding = "12px";
+          row.style.border = "1px solid #eee";
+
+          row.innerHTML = `
+            <div><strong>${k.name}</strong></div>
+            <div>Prefix: ${k.key_prefix}</div>
+            <div>Status: ${k.status}</div>
+            <div>Created: ${k.created_at}</div>
+            <div style="margin-top:10px;">
+              <button data-id="${k.id}" class="danger">Delete</button>
+            </div>
+          `;
+
+          row.querySelector("button[data-id]").addEventListener("click", async () => {
+            try {
+              await request("/api/api-keys/" + k.id, { method: "DELETE" });
+              await loadKeys();
+              rawKeyBox.classList.add("hidden");
+            } catch (err) {
+              alert(err.message);
+            }
+          });
+
+          keysList.appendChild(row);
+        });
+      };
+
+      const loadKeys = async () => {
+        const data = await request("/api/api-keys", { method: "GET" });
+        renderKeys(data.apiKeys);
+      };
+
+      const loadMe = async () => {
+        const data = await request("/api/auth/me", { method: "GET" });
+        currentUserId = data.user?.id ?? null;
+        userIdValue.textContent = currentUserId ?? "-";
+      };
+
+      const showApiDetails = (rawKey) => {
+        if (!currentUserId) return;
+        lastCreatedRawKey = rawKey;
+        const example = {
+          userId: currentUserId,
+          apiKey: rawKey,
+          phoneNumber: "+94717177326",
+          message: "Hello from API (example payload)",
+        };
+        examplePayloadText.textContent = JSON.stringify(example, null, 2);
+        apiDetailsBox.classList.remove("hidden");
+      };
+
+      createKeyBtn.addEventListener("click", async () => {
+        createKeyError.classList.add("hidden");
+        rawKeyBox.classList.add("hidden");
+        apiDetailsBox.classList.add("hidden");
+        lastCreatedRawKey = null;
+
+        const name = keyNameInput.value.trim();
+        if (!name) {
+          createKeyError.textContent = "Key name is required.";
+          createKeyError.classList.remove("hidden");
+          return;
+        }
+
+        try {
+          const data = await request("/api/api-keys", {
+            method: "POST",
+            body: JSON.stringify({ name }),
+          });
+
+          rawKeyText.textContent = data.apiKey.rawKey;
+          rawKeyBox.classList.remove("hidden");
+          showApiDetails(data.apiKey.rawKey);
+        } catch (err) {
+          createKeyError.textContent = err.message;
+          createKeyError.classList.remove("hidden");
+        }
+      });
+
+      copyRawKeyBtn.addEventListener("click", async () => {
+        if (!lastCreatedRawKey) {
+          alert("Create a new API key first.");
+          return;
+        }
+        await copyToClipboard(lastCreatedRawKey);
+        alert("API key copied.");
+      });
+
+      copyExampleBtn.addEventListener("click", async () => {
+        const text = examplePayloadText.textContent || "";
+        if (!text) {
+          alert("No example payload available yet.");
+          return;
+        }
+        await copyToClipboard(text);
+        alert("Example payload copied.");
+      });
+
+      // Load version on page load
+      (async () => {
+        try {
+          const v = await request("/api/version");
+          if (v?.version) {
+            document.getElementById("versionText").textContent = `v${v.version}`;
+          }
+        } catch (_) {}
+
+        try {
+          await loadMe();
+          await loadKeys();
+        } catch (err) {
+          alert(err.message);
+        }
+      })();
+    </script>
+  </body>
+</html>
+

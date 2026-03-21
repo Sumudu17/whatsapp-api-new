@@ -21,6 +21,42 @@ const getRequiredEnv = (name: string): string => {
 
 export const getEmailStatus = () => ({ ...status });
 
+const createTransporter = () => {
+  const host = getRequiredEnv("SMTP_HOST");
+  const port = Number(getRequiredEnv("SMTP_PORT"));
+  const user = getRequiredEnv("SMTP_USER");
+  const pass = getRequiredEnv("SMTP_PASS");
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: false,
+    auth: { user, pass },
+  });
+};
+
+export const sendEmail = async (to: string, subject: string, text: string) => {
+  const transporter = createTransporter();
+  const from =
+    process.env.SMTP_FROM || process.env.SMTP_USER || getRequiredEnv("SMTP_USER");
+
+  try {
+    const info = await transporter.sendMail({
+      from,
+      to,
+      subject,
+      text,
+    });
+
+    logger.info({ to, subject, messageId: info.messageId }, "Email sent");
+    return info;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown email error";
+    logger.error({ err, to, subject, message }, "Email send failed");
+    throw err;
+  }
+};
+
 export const sendAlertEmail = async (subject: string, text: string) => {
   const host = getRequiredEnv("SMTP_HOST");
   const port = Number(getRequiredEnv("SMTP_PORT"));
@@ -29,12 +65,7 @@ export const sendAlertEmail = async (subject: string, text: string) => {
   const to = getRequiredEnv("ALERT_EMAIL_TO");
   const from = process.env.SMTP_FROM || user;
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: false,
-    auth: { user, pass },
-  });
+  const transporter = createTransporter();
 
   try {
     const info = await transporter.sendMail({

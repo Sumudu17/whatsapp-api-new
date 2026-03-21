@@ -15,7 +15,12 @@
           <h1>WhatsApp Web Dashboard</h1>
           <span id="versionText" class="version-badge">v1.0.0</span>
         </div>
-        <button id="appLogoutBtn" class="secondary">App Logout</button>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="connectionBtn" class="secondary">Connection</button>
+          <button id="apiKeysBtn" class="secondary">API Keys</button>
+          <button id="profileBtn" class="secondary">Profile</button>
+          <button id="appLogoutBtn" class="secondary">App Logout</button>
+        </div>
       </header>
 
       <section class="grid">
@@ -26,8 +31,9 @@
           </p>
           <p>Status: <span id="statusText">NOT_INITIALIZED</span></p>
           <p>Client State: <span id="clientStateText">-</span></p>
+          <p id="lastErrorText" class="error hidden"></p>
           <div class="button-row">
-            <button id="initBtn">Initialize</button>
+            <button id="initBtn">Connect / Reconnect</button>
             <button id="waLogoutBtn" class="danger">Logout WhatsApp</button>
           </div>
           <div class="qr-box">
