@@ -6,31 +6,55 @@ export type WhatsAppStatus =
   | "READY"
   | "DISCONNECTED";
 
-type WhatsAppState = {
+export type WhatsAppState = {
   status: WhatsAppStatus;
   qrDataUrl: string | null;
   lastError?: string;
 };
 
-const state: WhatsAppState = {
-  status: "NOT_INITIALIZED",
-  qrDataUrl: null,
+const stateByUserId = new Map<number, WhatsAppState>();
+
+const getOrCreateState = (userId: number): WhatsAppState => {
+  const existing = stateByUserId.get(userId);
+  if (existing) {
+    return existing;
+  }
+
+  const created: WhatsAppState = {
+    status: "NOT_INITIALIZED",
+    qrDataUrl: null,
+  };
+  stateByUserId.set(userId, created);
+  return created;
 };
 
-export const getState = (): WhatsAppState => ({ ...state });
+export const getState = (userId: number): WhatsAppState => {
+  const state = getOrCreateState(userId);
+  return { ...state };
+};
 
-export const setStatus = (status: WhatsAppStatus) => {
+export const setStatus = (userId: number, status: WhatsAppStatus) => {
+  const state = getOrCreateState(userId);
   state.status = status;
   if (status !== "QR_REQUIRED") {
     state.qrDataUrl = null;
   }
 };
 
-export const setQrDataUrl = (dataUrl: string) => {
+export const setQrDataUrl = (userId: number, dataUrl: string) => {
+  const state = getOrCreateState(userId);
   state.qrDataUrl = dataUrl;
   state.status = "QR_REQUIRED";
 };
 
-export const setLastError = (message?: string) => {
+export const setLastError = (userId: number, message?: string) => {
+  const state = getOrCreateState(userId);
   state.lastError = message;
+};
+
+export const getAllStates = (): Array<{ userId: number; state: WhatsAppState }> => {
+  return Array.from(stateByUserId.entries()).map(([userId, s]) => ({
+    userId,
+    state: { ...s },
+  }));
 };

@@ -7,6 +7,10 @@ const qrHint = document.getElementById("qrHint");
 const initBtn = document.getElementById("initBtn");
 const waLogoutBtn = document.getElementById("waLogoutBtn");
 const appLogoutBtn = document.getElementById("appLogoutBtn");
+const apiKeysBtn = document.getElementById("apiKeysBtn");
+const profileBtn = document.getElementById("profileBtn");
+const connectionBtn = document.getElementById("connectionBtn");
+const lastErrorText = document.getElementById("lastErrorText");
 const sendBtn = document.getElementById("sendBtn");
 const refreshGroupsBtn = document.getElementById("refreshGroupsBtn");
 const sendResult = document.getElementById("sendResult");
@@ -25,6 +29,16 @@ const setStatus = (state) => {
   serverStatus.classList.add("hidden");
   statusText.textContent = state.status || "UNKNOWN";
   clientStateText.textContent = state.clientState || "-";
+
+  if (lastErrorText) {
+    if (state.lastError) {
+      lastErrorText.textContent = `Error: ${state.lastError}`;
+      lastErrorText.classList.remove("hidden");
+    } else {
+      lastErrorText.textContent = "";
+      lastErrorText.classList.add("hidden");
+    }
+  }
 
   if (state.qrDataUrl) {
     qrImage.src = state.qrDataUrl;
@@ -108,6 +122,18 @@ waLogoutBtn.addEventListener("click", async () => {
 appLogoutBtn.addEventListener("click", async () => {
   await request("/api/auth/logout", { method: "POST" });
   window.location.href = "/login";
+});
+
+apiKeysBtn.addEventListener("click", async () => {
+  window.location.href = "/api-keys";
+});
+
+profileBtn.addEventListener("click", async () => {
+  window.location.href = "/profile";
+});
+
+connectionBtn.addEventListener("click", async () => {
+  window.location.href = "/connection";
 });
 
 const loadGroups = async () => {

@@ -1,37 +1,42 @@
-import { getState } from "./state";
+import { getAllStates } from "./state";
 import { sendAlertEmail } from "../services/email.service";
 
-let notReadySince: number | null = null;
-let alertSent = false;
+const notReadySinceByUserId = new Map<number, number>();
+const alertSentByUserId = new Set<number>();
 
 export const startWhatsAppMonitor = () => {
   const intervalMs = 30 * 1000;
   const thresholdMs = 5 * 60 * 1000;
 
   setInterval(async () => {
-    const status = getState().status;
     const now = Date.now();
 
-    if (status === "READY") {
-      notReadySince = null;
-      alertSent = false;
-      return;
-    }
+    const allStates = getAllStates();
+    for (const { userId, state } of allStates) {
+      const status = state.status;
 
-    if (!notReadySince) {
-      notReadySince = now;
-      return;
-    }
+      if (status === "READY") {
+        notReadySinceByUserId.delete(userId);
+        alertSentByUserId.delete(userId);
+        continue;
+      }
 
-    if (!alertSent && now - notReadySince >= thresholdMs) {
-      alertSent = true;
-      try {
-        await sendAlertEmail(
-          "WhatsApp client not ready",
-          `WhatsApp client has been ${status} for more than 5 minutes.`
-        );
-      } catch {
-        // error already logged by email service
+      if (!notReadySinceByUserId.has(userId)) {
+        notReadySinceByUserId.set(userId, now);
+        continue;
+      }
+
+      const notReadySince = notReadySinceByUserId.get(userId)!;
+      if (!alertSentByUserId.has(userId) && now - notReadySince >= thresholdMs) {
+        alertSentByUserId.add(userId);
+        try {
+          await sendAlertEmail(
+            "WhatsApp client not ready",
+            `WhatsApp client for userId=${userId} has been ${status} for more than 5 minutes.`
+          );
+        } catch {
+          // error already logged by email service
+        }
       }
     }
   }, intervalMs);
