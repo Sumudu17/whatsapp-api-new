@@ -93,6 +93,11 @@ jobs:
               exit 1
             fi
 
+            echo "🔄 Updating installed npm packages..."
+            # NOTE: this can modify node_modules based on semver ranges in package-lock.json.
+            # If you prefer fully deterministic deploys, remove this step and rely on `npm ci`.
+            npm update --omit=dev --no-audit --no-fund || echo "⚠️ npm update failed, continuing anyway..."
+
             echo "🔨 Building TypeScript..."
             npm run build || echo "⚠️ Build failed, continuing anyway..."
 
