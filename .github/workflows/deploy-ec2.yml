@@ -136,5 +136,4 @@ jobs:
             sudo systemctl enable wa-api-3004 || true
             sudo systemctl restart wa-api-3004 || echo "⚠️ Service restart failed, service may not exist yet"
             sudo systemctl status wa-api-3004 --no-pager || echo "⚠️ Service status unavailable"
-
             echo "✅ Deployment completed successfully!"
