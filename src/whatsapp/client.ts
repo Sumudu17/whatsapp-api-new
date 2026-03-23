@@ -34,6 +34,20 @@ const clearSessionDirForUser = (userId: number) => {
   }
 };
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const getInitRetryCount = () => {
+  const raw = process.env.WHATSAPP_INIT_RETRIES ?? "2";
+  const n = Number(raw);
+  return Number.isNaN(n) || n < 0 ? 2 : n;
+};
+
+const getInitRetryDelayMs = () => {
+  const raw = process.env.WHATSAPP_INIT_RETRY_DELAY_MS ?? "3000";
+  const n = Number(raw);
+  return Number.isNaN(n) || n < 0 ? 3000 : n;
+};
+
 const buildClient = (userId: number) => {
   const clientId = String(userId);
   const dataPath = process.env.WWEBJS_AUTH_PATH || undefined;
@@ -45,7 +59,14 @@ const buildClient = (userId: number) => {
     }),
     puppeteer: {
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+      ],
     },
   });
 };
@@ -119,15 +140,47 @@ export const initializeClient = async (
   attachClientEvents(userId, client);
   clientByUserId.set(userId, client);
 
-  const initializing = client
-    .initialize()
-    .then(() => {
-      logger.info({ userId }, "WhatsApp client initialized");
-      return client;
-    })
-    .finally(() => {
-      initializingByUserId.delete(userId);
-    });
+  const maxRetries = getInitRetryCount();
+  const retryDelayMs = getInitRetryDelayMs();
+
+  const initializing = (async () => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          logger.warn(
+            { userId, attempt, maxRetries, retryDelayMs },
+            "Retrying WhatsApp client initialization"
+          );
+          await sleep(retryDelayMs);
+        }
+        await client.initialize();
+        logger.info({ userId }, "WhatsApp client initialized");
+        return client;
+      } catch (err) {
+        lastErr = err;
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn(
+          { userId, attempt, maxRetries, message },
+          "WhatsApp client initialization attempt failed"
+        );
+      }
+    }
+
+    // Cleanup broken client instance after final failure.
+    clientByUserId.delete(userId);
+    lastClientActivityByUserId.delete(userId);
+    setStatus(userId, "DISCONNECTED");
+    await updateWhatsappSessionStatus(userId, {
+      status: "DISCONNECTED",
+      lastDisconnectedAt: new Date(),
+      lastDisconnectedReason:
+        lastErr instanceof Error ? lastErr.message : "Initialization failed",
+    }).catch(() => {});
+    throw lastErr;
+  })().finally(() => {
+    initializingByUserId.delete(userId);
+  });
 
   initializingByUserId.set(userId, initializing);
   return initializing;

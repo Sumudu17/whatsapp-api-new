@@ -7,7 +7,7 @@ const qrHint = document.getElementById("qrHint");
 const initBtn = document.getElementById("initBtn");
 const waLogoutBtn = document.getElementById("waLogoutBtn");
 const appLogoutBtn = document.getElementById("appLogoutBtn");
-const apiKeysBtn = document.getElementById("apiKeysBtn");
+const apiBtn = document.getElementById("apiBtn");
 const profileBtn = document.getElementById("profileBtn");
 const connectionBtn = document.getElementById("connectionBtn");
 const lastErrorText = document.getElementById("lastErrorText");
@@ -124,8 +124,8 @@ appLogoutBtn.addEventListener("click", async () => {
   window.location.href = "/login";
 });
 
-apiKeysBtn.addEventListener("click", async () => {
-  window.location.href = "/api-keys";
+apiBtn.addEventListener("click", async () => {
+  window.location.href = "/api";
 });
 
 profileBtn.addEventListener("click", async () => {

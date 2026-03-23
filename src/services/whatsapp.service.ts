@@ -64,6 +64,7 @@ export const getWhatsAppGroups = async (userId: number) => {
     .filter((chat: any) => chat.isGroup)
     .map((chat: any) => ({
       id: chat.id?._serialized ?? chat.id,
+      groupId: chat.id?._serialized ?? chat.id,
       name: chat.name ?? chat.formattedTitle ?? "Unnamed Group",
       participants: chat.participants?.length ?? 0,
     }));

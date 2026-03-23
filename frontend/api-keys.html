@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>API Keys</title>
+    <title>API</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -12,7 +12,7 @@
     <div class="container">
       <header class="header">
         <div>
-          <h1>API Keys</h1>
+          <h1>API</h1>
           <span id="versionText" class="version-badge">v1.0.0</span>
         </div>
         <div style="display:flex; gap:10px;">
@@ -47,7 +47,7 @@
             </div>
           </div>
 
-          <div id="apiDetailsBox" class="hidden" style="margin-top:16px;">
+          <div id="apiDetailsBox" style="margin-top:16px;">
             <h3 style="margin-top:0;">API Details</h3>
             <p style="margin-top:0;">
               Endpoint:
@@ -56,10 +56,26 @@
             <p>
               Use either <code>phoneNumber</code> or <code>groupId</code> (xor).
             </p>
-            <p style="margin-bottom:6px;">
-              Example request body:
+            <div style="margin-top:10px;">
+              <h4 style="margin:0 0 6px;">Direct Number Example</h4>
+              <pre id="examplePhonePayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+            </div>
+            <div style="margin-top:10px;">
+              <h4 style="margin:0 0 6px;">Group Message Example</h4>
+              <pre id="exampleGroupPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+            </div>
+            <p style="margin-top:10px;">
+              API endpoint:
+              <code>POST /api/whatsapp/send</code>
             </p>
-            <pre id="examplePayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+            <div style="margin-top:10px;">
+              <h4 style="margin:0 0 6px;">Available Groups (groupId + name)</h4>
+              <p id="groupsStatusText" class="info" style="margin:0 0 6px;">
+                Click refresh to fetch groups.
+              </p>
+              <button id="refreshGroupsBtnApi" class="secondary small" type="button">Refresh Groups</button>
+              <div id="groupsListApi" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -91,10 +107,14 @@
       const rawKeyBox = document.getElementById("rawKeyBox");
       const rawKeyText = document.getElementById("rawKeyText");
       const apiDetailsBox = document.getElementById("apiDetailsBox");
-      const examplePayloadText = document.getElementById("examplePayloadText");
+      const examplePhonePayloadText = document.getElementById("examplePhonePayloadText");
+      const exampleGroupPayloadText = document.getElementById("exampleGroupPayloadText");
       const copyRawKeyBtn = document.getElementById("copyRawKeyBtn");
       const copyExampleBtn = document.getElementById("copyExampleBtn");
       const userIdValue = document.getElementById("userIdValue");
+      const refreshGroupsBtnApi = document.getElementById("refreshGroupsBtnApi");
+      const groupsListApi = document.getElementById("groupsListApi");
+      const groupsStatusText = document.getElementById("groupsStatusText");
 
       let currentUserId = null;
       let lastCreatedRawKey = null;
@@ -167,20 +187,64 @@
       const showApiDetails = (rawKey) => {
         if (!currentUserId) return;
         lastCreatedRawKey = rawKey;
-        const example = {
+        const keyValue = rawKey || "RAW_API_KEY_VALUE";
+        const phoneExample = {
           userId: currentUserId,
-          apiKey: rawKey,
+          apiKey: keyValue,
           phoneNumber: "+94717177326",
-          message: "Hello from API (example payload)",
+          message: "Hello from API (direct number)",
         };
-        examplePayloadText.textContent = JSON.stringify(example, null, 2);
+        const groupExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          groupId: "1234567890-123456789@g.us",
+          message: "Hello from API (group message)",
+        };
+        examplePhonePayloadText.textContent = JSON.stringify(phoneExample, null, 2);
+        exampleGroupPayloadText.textContent = JSON.stringify(groupExample, null, 2);
         apiDetailsBox.classList.remove("hidden");
+      };
+
+      const loadGroupsForApiSection = async () => {
+        groupsStatusText.textContent = "Loading groups...";
+        groupsListApi.innerHTML = "";
+        try {
+          const data = await request("/api/whatsapp/groups", { method: "GET" });
+          const groups = data.groups || [];
+          if (!groups.length) {
+            groupsStatusText.textContent = "No groups found.";
+            return;
+          }
+          groupsStatusText.textContent = `Found ${groups.length} group(s).`;
+          groups.forEach((group) => {
+            const row = document.createElement("div");
+            const groupId = group.groupId || group.id || "-";
+            row.className = "info";
+            row.style.padding = "8px";
+            row.innerHTML = `
+              <strong>${group.name || "Unnamed Group"}</strong><br />
+              <code>${groupId}</code>
+              <div style="margin-top:6px;">
+                <button class="secondary small copy-group-id-btn" type="button" data-group-id="${groupId}">
+                  Copy Group ID
+                </button>
+              </div>
+            `;
+            const copyBtn = row.querySelector(".copy-group-id-btn");
+            copyBtn.addEventListener("click", async () => {
+              await copyToClipboard(groupId);
+              alert("Group ID copied.");
+            });
+            groupsListApi.appendChild(row);
+          });
+        } catch (err) {
+          groupsStatusText.textContent = err.message || "Failed to fetch groups.";
+        }
       };
 
       createKeyBtn.addEventListener("click", async () => {
         createKeyError.classList.add("hidden");
         rawKeyBox.classList.add("hidden");
-        apiDetailsBox.classList.add("hidden");
         lastCreatedRawKey = null;
 
         const name = keyNameInput.value.trim();
@@ -215,13 +279,25 @@
       });
 
       copyExampleBtn.addEventListener("click", async () => {
-        const text = examplePayloadText.textContent || "";
+        const phoneText = examplePhonePayloadText.textContent || "";
+        const groupText = exampleGroupPayloadText.textContent || "";
+        const text = [
+          "Direct Number Example:",
+          phoneText,
+          "",
+          "Group Message Example:",
+          groupText,
+        ].join("\n");
         if (!text) {
           alert("No example payload available yet.");
           return;
         }
         await copyToClipboard(text);
         alert("Example payload copied.");
+      });
+
+      refreshGroupsBtnApi.addEventListener("click", async () => {
+        await loadGroupsForApiSection();
       });
 
       // Load version on page load
@@ -235,6 +311,7 @@
 
         try {
           await loadMe();
+          showApiDetails(null);
           await loadKeys();
         } catch (err) {
           alert(err.message);

@@ -33,12 +33,15 @@ server.listen(port, async () => {
     const maxAutoInit = process.env.AUTO_INIT_MAX_WHATSAPP_CLIENTS
       ? Number(process.env.AUTO_INIT_MAX_WHATSAPP_CLIENTS)
       : Number(process.env.MAX_ACTIVE_WHATSAPP_CLIENTS || "5");
+    const autoInitStaggerMs = process.env.AUTO_INIT_STAGGER_MS
+      ? Number(process.env.AUTO_INIT_STAGGER_MS)
+      : 3000;
 
     try {
       const userIds = await listActiveUsersForAutoInit({ limit: maxAutoInit });
 
       logger.info(
-        { count: userIds.length, maxAutoInit },
+        { count: userIds.length, maxAutoInit, autoInitStaggerMs },
         "Auto-initializing WhatsApp clients for active users"
       );
 
@@ -51,7 +54,7 @@ server.listen(port, async () => {
         });
         // eslint-disable-next-line no-await-in-loop
         if (i < userIds.length - 1) {
-          await new Promise((r) => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, autoInitStaggerMs));
         }
       }
     } catch (err) {
