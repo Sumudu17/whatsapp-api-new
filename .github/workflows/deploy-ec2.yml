@@ -124,6 +124,9 @@ jobs:
             echo "🔄 Restarting app..."
 
             echo "🔄 Restarting systemd service..."
+            # Build one more time right before restart to ensure dist matches the latest code.
+            # (Migrations run via Docker do not affect dist, but this keeps deployment deterministic.)
+            npm run build || echo "⚠️ Final build failed, continuing anyway..."
             sudo systemctl daemon-reload
             sudo systemctl enable wa-api-3004 || true
             sudo systemctl restart wa-api-3004 || echo "⚠️ Service restart failed, service may not exist yet"
