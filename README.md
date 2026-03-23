@@ -73,7 +73,7 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - After login, open:
   - `http://localhost:4000/` (dashboard)
   - `http://localhost:4000/connection` (QR + connection status)
-  - `http://localhost:4000/api-keys` (API key management)
+  - `http://localhost:4000/api` (API key management)
   - `http://localhost:4000/profile` (name/email/password)
 
 ### API Endpoints
@@ -128,14 +128,25 @@ Example (group):
 
 Rules: provide exactly one of `phoneNumber` or `groupId`.
 
-Request body:
+#### Direct number request body
 
 ```
 {
   "userId": 1,
   "apiKey": "RAW_API_KEY_VALUE",
   "phoneNumber": "+94717177326",
-  "message": "Hello from external app"
+  "message": "Hello from API (direct number)"
+}
+```
+
+#### Group message request body
+
+```
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "groupId": "1234567890-123456789@g.us",
+  "message": "Hello from API (group message)"
 }
 ```
 

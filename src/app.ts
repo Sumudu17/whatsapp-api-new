@@ -13,6 +13,26 @@ import { RequestHandler } from "express";
 export const createApp = (sessionMiddleware: RequestHandler) => {
   const app = express();
 
+  // When behind nginx (or any reverse proxy), the proxy usually sets
+  // `X-Forwarded-For`. `express-rate-limit` requires Express `trust proxy`
+  // to be enabled, otherwise it throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+  //
+  // Default: trust the first proxy hop (`1`) since your deployment uses nginx.
+  const trustProxyEnv = process.env.TRUST_PROXY;
+  let trustProxy: boolean | number = 1;
+  if (trustProxyEnv !== undefined) {
+    const v = trustProxyEnv.toLowerCase();
+    if (v === "false" || v === "0") {
+      trustProxy = false;
+    } else if (v === "true" || v === "1") {
+      trustProxy = 1;
+    } else {
+      const n = Number(trustProxyEnv);
+      trustProxy = Number.isNaN(n) ? 1 : n;
+    }
+  }
+  app.set("trust proxy", trustProxy);
+
   app.use(express.json({ limit: "1mb" }));
   app.use((req, res, next) => {
     if (req.path.startsWith("/api/")) {
@@ -106,8 +126,13 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
     res.sendFile(path.join(frontendPath, "verify-email.html"));
   });
 
-  app.get("/api-keys", (_req, res) => {
+  app.get("/api", (_req, res) => {
     res.sendFile(path.join(frontendPath, "api-keys.html"));
+  });
+
+  // Backward-compatible route
+  app.get("/api-keys", (_req, res) => {
+    return res.redirect("/api");
   });
 
   app.get("/profile", (_req, res) => {
