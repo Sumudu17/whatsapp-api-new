@@ -36,6 +36,20 @@ const clearSessionDirForUser = (userId: number) => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const clearSessionLockFiles = (userId: number) => {
+  const dir = getSessionDirForUser(userId);
+  if (!fs.existsSync(dir)) return;
+  const lockFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
+  for (const name of lockFiles) {
+    const full = path.join(dir, name);
+    try {
+      if (fs.existsSync(full)) fs.rmSync(full, { force: true });
+    } catch (err) {
+      logger.warn({ err, full }, "Failed to clear Chromium lock file");
+    }
+  }
+};
+
 const getInitRetryCount = () => {
   const raw = process.env.WHATSAPP_INIT_RETRIES ?? "2";
   const n = Number(raw);
@@ -136,15 +150,12 @@ export const initializeClient = async (
   updateWhatsappSessionStatus(userId, { status: "INITIALIZING" }).catch(() => {});
   lastClientActivityByUserId.set(userId, Date.now());
 
-  const client = buildClient(userId);
-  attachClientEvents(userId, client);
-  clientByUserId.set(userId, client);
-
   const maxRetries = getInitRetryCount();
   const retryDelayMs = getInitRetryDelayMs();
 
   const initializing = (async () => {
     let lastErr: unknown;
+    let activeClient: any = null;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
@@ -154,12 +165,25 @@ export const initializeClient = async (
           );
           await sleep(retryDelayMs);
         }
+        clearSessionLockFiles(userId);
+        const client = buildClient(userId);
+        activeClient = client;
+        attachClientEvents(userId, client);
+        clientByUserId.set(userId, client);
         await client.initialize();
         logger.info({ userId }, "WhatsApp client initialized");
         return client;
       } catch (err) {
         lastErr = err;
         const message = err instanceof Error ? err.message : String(err);
+        // Ensure failed attempt does not keep browser/profile lock.
+        try {
+          if (activeClient) {
+            await activeClient.destroy();
+          }
+        } catch {}
+        activeClient = null;
+        clientByUserId.delete(userId);
         logger.warn(
           { userId, attempt, maxRetries, message },
           "WhatsApp client initialization attempt failed"
