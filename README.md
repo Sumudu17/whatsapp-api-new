@@ -42,18 +42,24 @@ sudo apt-get install -y ca-certificates fonts-liberation libappindicator3-1 liba
    - `copy .env.example .env` (Windows PowerShell)
 3. Set credentials and config in `.env`:
    - `SESSION_SECRET` (optional; defaults to `dev_session_secret`)
-   - `DEFAULT_TO` (optional default recipient)
-   - `WWEBJS_CLIENT_ID` (optional, defaults to `api`)
-   - `WWEBJS_AUTH_PATH` (optional custom auth path)
+   - `WWEBJS_AUTH_PATH` (optional; default `.wwebjs_auth` under project root)
    - `AUTO_INIT` (optional, defaults to `true`)
    - `API_AUTH_REQUIRED` (optional, defaults to `false`)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
    - `SMTP_FROM` (optional, defaults to `SMTP_USER`)
    - `ALERT_EMAIL_TO` (required for alerts)
-   - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB`
+   - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (legacy `MYSQL_*` still supported if `DB_*` is unset)
    - `ADMIN_EMAIL` (admin notifications on disconnect)
 
    - `OTP_PEPPER` (recommended), `OTP_EXPIRES_MINUTES`, `OTP_RESEND_MIN_SECONDS`, `OTP_MAX_INVALID_ATTEMPTS`
+
+### Database migrations (Flyway)
+
+Schema changes are applied with **Flyway** (Docker), not by the Node app on startup.
+
+- See **`docs/FLYWAY_SETUP.md`**
+- Plan / notes: **`FLYWAY_MIGRATION_CONVERSION_PLAN.md`**
+- Local: `./run-flyway.sh migrate` (Linux/macOS) or `run-flyway.bat migrate` (Windows)
 
 ### Run
 - Dev server: `npm run dev`

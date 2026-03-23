@@ -1,3 +1,6 @@
+-- V1: Initial database schema (multi-user WhatsApp platform)
+-- Migrated from legacy migrations/001_init.sql — do not edit after apply; add V2+ for changes.
+
 -- Initial schema for multi-user WhatsApp platform
 
 CREATE TABLE IF NOT EXISTS users (
@@ -89,4 +92,3 @@ CREATE TABLE IF NOT EXISTS notification_events (
   KEY idx_notification_events_user_id (user_id),
   KEY idx_notification_events_sent_at (sent_at)
 ) ENGINE=InnoDB;
-

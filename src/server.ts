@@ -5,7 +5,6 @@ import { createApp } from "./app";
 import { initSockets } from "./sockets";
 import { startWhatsAppMonitor } from "./whatsapp/monitor";
 import { logger } from "./utils/logger";
-import { runMigrations } from "./db/migrator";
 import { initializeWhatsApp } from "./services/whatsapp.service";
 import { listActiveUsersForAutoInit } from "./db/whatsapp.repo";
 
@@ -27,11 +26,7 @@ initSockets(server, sessionMiddleware);
 server.listen(port, async () => {
   logger.info({ port }, "Server listening");
 
-  try {
-    await runMigrations();
-  } catch (err) {
-    logger.warn({ err }, "MySQL migrations failed");
-  }
+  // Database schema is managed by Flyway (see docs/FLYWAY_SETUP.md, run-flyway.sh / run-flyway.bat).
 
   const autoInit = (process.env.AUTO_INIT ?? "true").toLowerCase() === "true";
   if (autoInit) {

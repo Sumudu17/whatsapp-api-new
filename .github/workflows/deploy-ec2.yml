@@ -96,6 +96,31 @@ jobs:
             echo "🔨 Building TypeScript..."
             npm run build || echo "⚠️ Build failed, continuing anyway..."
 
+            echo "🐳 Checking Docker (required for Flyway)..."
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "⚠️ Docker not found. Installing Docker..."
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              sudo systemctl enable --now docker
+            fi
+            if ! sudo systemctl is-active --quiet docker 2>/dev/null; then
+              echo "⚠️ Docker not running. Starting Docker..."
+              sudo systemctl start docker || true
+            fi
+
+            if [ -f "$PROJECT_PATH/run-flyway.sh" ]; then
+              echo "🔧 Making run-flyway.sh executable..."
+              sudo chmod +x "$PROJECT_PATH/run-flyway.sh"
+              echo "🗄️ Running database migrations with Flyway..."
+              cd "$PROJECT_PATH"
+              sudo bash run-flyway.sh migrate
+              echo "📊 Migration status:"
+              sudo bash run-flyway.sh info
+            else
+              echo "❌ run-flyway.sh not found at $PROJECT_PATH/run-flyway.sh"
+              exit 1
+            fi
+
             echo "🔄 Restarting app..."
 
             echo "🔄 Restarting systemd service..."
