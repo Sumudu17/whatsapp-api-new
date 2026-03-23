@@ -62,6 +62,29 @@ const getInitRetryDelayMs = () => {
   return Number.isNaN(n) || n < 0 ? 3000 : n;
 };
 
+const getInitWaitForStateMs = () => {
+  const raw = process.env.WHATSAPP_INIT_WAIT_FOR_STATE_MS ?? "60000";
+  const n = Number(raw);
+  return Number.isNaN(n) || n <= 0 ? 60000 : n;
+};
+
+const waitForInitialState = async (userId: number, timeoutMs: number) => {
+  const start = Date.now();
+  // We consider QR generation + successful auth as "initialization usable".
+  const okStates = new Set(["QR_REQUIRED", "AUTHENTICATED", "READY"]);
+
+  while (Date.now() - start < timeoutMs) {
+    const st = getState(userId)?.status;
+    if (okStates.has(st)) return st;
+    if (st === "DISCONNECTED") {
+      throw new Error("WhatsApp disconnected during init");
+    }
+    await sleep(500);
+  }
+
+  throw new Error(`WhatsApp init wait timeout after ${timeoutMs}ms`);
+};
+
 const buildClient = (userId: number) => {
   const clientId = String(userId);
   const dataPath = process.env.WWEBJS_AUTH_PATH || undefined;
@@ -152,6 +175,7 @@ export const initializeClient = async (
 
   const maxRetries = getInitRetryCount();
   const retryDelayMs = getInitRetryDelayMs();
+  const waitForStateMs = getInitWaitForStateMs();
 
   const initializing = (async () => {
     let lastErr: unknown;
@@ -171,6 +195,8 @@ export const initializeClient = async (
         attachClientEvents(userId, client);
         clientByUserId.set(userId, client);
         await client.initialize();
+        // Wait until QR/READY/Auth event has fired for this user.
+        await waitForInitialState(userId, waitForStateMs);
         logger.info({ userId }, "WhatsApp client initialized");
         return client;
       } catch (err) {
