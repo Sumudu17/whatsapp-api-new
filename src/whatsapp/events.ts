@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { getIo } from "../sockets";
 import { logger } from "../utils/logger";
-import { getState, setLastError, setQrDataUrl, setStatus } from "./state";
+import { getState, setClientInfo, setLastError, setQrDataUrl, setStatus } from "./state";
 import { updateWhatsappSessionStatus } from "../db/whatsapp.repo";
 import { notifyWhatsAppDisconnect } from "../services/notification.service";
 
@@ -40,14 +40,36 @@ export const attachClientEvents = (userId: number, client: any) => {
   });
 
   client.on("ready", () => {
+    let pushname: string | null = null;
+    let widSerialized: string | null = null;
+    let phoneNumber: string | null = null;
+    try {
+      const info = client.info;
+      pushname = info?.pushname ?? null;
+      widSerialized = info?.wid?._serialized ?? null;
+      phoneNumber = info?.wid?.user ?? null;
+    } catch {
+      // ignore malformed info
+    }
+
     setStatus(userId, "READY");
+    setClientInfo(userId, { pushname, widSerialized, phoneNumber });
+
+    logger.info(
+      { userId, pushname, widSerialized, phoneNumber },
+      "WhatsApp client ready"
+    );
+    console.log(`[WhatsApp userId=${userId}] Client is ready`);
+    console.log(`[WhatsApp userId=${userId}] Push name:`, pushname);
+    console.log(`[WhatsApp userId=${userId}] WID:`, widSerialized);
+    console.log(`[WhatsApp userId=${userId}] Phone number:`, phoneNumber);
+
     updateWhatsappSessionStatus(userId, {
       status: "READY",
       lastConnectedAt: new Date(),
     }).catch(() => {});
     safeEmitToUser(userId, "ready");
     safeEmitToUser(userId, "state_change", getState(userId));
-    logger.info("WhatsApp ready");
   });
 
   client.on("auth_failure", (msg: string) => {

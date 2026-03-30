@@ -6,10 +6,18 @@ export type WhatsAppStatus =
   | "READY"
   | "DISCONNECTED";
 
+export type ClientInfo = {
+  pushname: string | null;
+  widSerialized: string | null;
+  phoneNumber: string | null;
+};
+
 export type WhatsAppState = {
   status: WhatsAppStatus;
   qrDataUrl: string | null;
   lastError?: string;
+  /** Set when status is READY (from client.info) */
+  clientInfo?: ClientInfo;
 };
 
 const stateByUserId = new Map<number, WhatsAppState>();
@@ -39,6 +47,14 @@ export const setStatus = (userId: number, status: WhatsAppStatus) => {
   if (status !== "QR_REQUIRED") {
     state.qrDataUrl = null;
   }
+  if (status !== "READY") {
+    state.clientInfo = undefined;
+  }
+};
+
+export const setClientInfo = (userId: number, info: ClientInfo) => {
+  const state = getOrCreateState(userId);
+  state.clientInfo = { ...info };
 };
 
 export const setQrDataUrl = (userId: number, dataUrl: string) => {

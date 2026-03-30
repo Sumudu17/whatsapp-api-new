@@ -23,6 +23,11 @@ import {
 
 const OTP_PURPOSE_REGISTER_ACTIVATION = "register_activation";
 const OTP_PURPOSE_CHANGE_EMAIL = "change_email";
+const OTP_PURPOSE_PASSWORD_RESET = "password_reset";
+
+/** Same response whether the email exists or not (avoid account enumeration). */
+export const FORGOT_PASSWORD_PUBLIC_MESSAGE =
+  "If an account exists for that email, a reset code will be sent shortly.";
 
 const getOtpPepper = () => {
   const pepper = process.env.OTP_PEPPER ?? "";
@@ -310,5 +315,105 @@ export const getMe = async (userId: number) => {
     throw new ApiError(404, "User not found");
   }
   return user;
+};
+
+/**
+ * Issue a password-reset OTP email (or no-op) for verified, active accounts.
+ * Throttled by OTP_RESEND_MIN_SECONDS per unused code row.
+ */
+export const requestPasswordReset = async (params: { email: string }) => {
+  const email = params.email.trim();
+  const user = await getUserByEmail(email);
+  if (!user || !user.is_active) {
+    return;
+  }
+
+  const latest = await getLatestUnusedEmailOtp({
+    userId: user.id,
+    email,
+    purpose: OTP_PURPOSE_PASSWORD_RESET,
+  });
+
+  if (latest?.last_sent_at) {
+    const nextAllowed = new Date(
+      new Date(latest.last_sent_at as any).getTime() + getOtpResendMinSeconds() * 1000
+    );
+    if (nowIsBefore(nextAllowed)) {
+      return;
+    }
+  }
+
+  if (latest) {
+    await deleteUnusedEmailOtpLock({ otpId: latest.id });
+  }
+
+  const otp = generateNumericOtp(6);
+  const otpHash = sha256Hex(`${otp}${getOtpPepper()}`);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + getOtpExpiresMinutes() * 60_000);
+
+  await createEmailOtp({
+    userId: user.id,
+    email,
+    purpose: OTP_PURPOSE_PASSWORD_RESET,
+    otpHash,
+    expiresAt,
+    lastSentAt: now,
+  });
+
+  await sendEmail(
+    email,
+    "Reset your WhatsApp Web password",
+    `Your password reset code is: ${otp}\n\nThis code expires in ${getOtpExpiresMinutes()} minutes.\nIf you did not request this, you can ignore this email.`
+  );
+};
+
+export const completePasswordReset = async (params: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}) => {
+  const email = params.email.trim();
+  const user = await getUserByEmail(email);
+  if (!user || !user.is_active) {
+    throw new ApiError(400, "Invalid email or reset code");
+  }
+
+  const latest = await getLatestUnusedEmailOtp({
+    userId: user.id,
+    email,
+    purpose: OTP_PURPOSE_PASSWORD_RESET,
+  });
+  if (!latest) {
+    throw new ApiError(400, "Invalid email or reset code");
+  }
+
+  if (latest.expires_at.getTime() < Date.now()) {
+    throw new ApiError(400, "Invalid email or reset code");
+  }
+
+  const presentedHash = sha256Hex(`${params.otp}${getOtpPepper()}`);
+  const isValid = timingSafeEqualHex(presentedHash, latest.otp_hash);
+
+  if (!isValid) {
+    const nextFailedAttempts = latest.failed_attempts + 1;
+    await incrementEmailOtpFailedAttempts({
+      otpId: latest.id,
+      failedAttempts: nextFailedAttempts,
+    });
+    if (nextFailedAttempts >= getOtpMaxInvalidAttempts()) {
+      await deleteUnusedEmailOtpLock({ otpId: latest.id });
+    }
+    throw new ApiError(400, "Invalid email or reset code");
+  }
+
+  await markEmailOtpUsed(latest.id);
+  const newPasswordHash = await bcrypt.hash(params.newPassword, 12);
+  await setUserPasswordHash(user.id, newPasswordHash);
+  await invalidateUnusedEmailOtps({
+    userId: user.id,
+    email,
+    purpose: OTP_PURPOSE_PASSWORD_RESET,
+  });
 };
 

@@ -7,14 +7,33 @@ const qrHint = document.getElementById('qrHint');
 const initBtn = document.getElementById('initBtn');
 const waLogoutBtn = document.getElementById('waLogoutBtn');
 const disconnectedAlert = document.getElementById('disconnectedAlert');
+const clientDetailsBox = document.getElementById('clientDetailsBox');
+const clientPushname = document.getElementById('clientPushname');
+const clientWid = document.getElementById('clientWid');
+const clientPhone = document.getElementById('clientPhone');
 
 const socket = io({ withCredentials: true });
+
+const applyClientDetails = (state) => {
+  const ci = state && state.clientInfo;
+  const show = state && state.status === 'READY' && ci;
+  if (!clientDetailsBox) return;
+  if (show) {
+    clientDetailsBox.classList.remove('hidden');
+    if (clientPushname) clientPushname.textContent = ci.pushname || '—';
+    if (clientWid) clientWid.textContent = ci.widSerialized || '—';
+    if (clientPhone) clientPhone.textContent = ci.phoneNumber || '—';
+  } else {
+    clientDetailsBox.classList.add('hidden');
+  }
+};
 
 const setStatus = (state) => {
   if (!state) return;
   if (serverStatus) serverStatus.classList.add('hidden');
   if (statusText) statusText.textContent = state.status || 'UNKNOWN';
   if (clientStateText) clientStateText.textContent = state.clientState || '-';
+  applyClientDetails(state);
 
   if (lastErrorText) {
     if (state.lastError) {
@@ -71,6 +90,7 @@ socket.on('disconnect', () => {
   if (serverStatus) serverStatus.classList.remove('hidden');
   if (statusText) statusText.textContent = 'SERVER_OFFLINE';
   if (clientStateText) clientStateText.textContent = '-';
+  applyClientDetails({ status: 'DISCONNECTED' });
   qrImage.removeAttribute('src');
   qrImage.classList.add('hidden');
   if (qrHint) qrHint.classList.remove('hidden');
@@ -80,6 +100,7 @@ socket.on('connect_error', () => {
   if (serverStatus) serverStatus.classList.remove('hidden');
   if (statusText) statusText.textContent = 'SERVER_OFFLINE';
   if (clientStateText) clientStateText.textContent = '-';
+  applyClientDetails({ status: 'DISCONNECTED' });
   qrImage.removeAttribute('src');
   qrImage.classList.add('hidden');
   if (qrHint) qrHint.classList.remove('hidden');
@@ -88,6 +109,7 @@ socket.on('connect_error', () => {
 const request = async (url, options = {}) => {
   const res = await fetch(url, {
     ...options,
+    credentials: 'include',
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   });
@@ -123,6 +145,13 @@ waLogoutBtn.addEventListener('click', async () => {
     if (data.version) {
       const versionText = document.getElementById('versionText');
       if (versionText) versionText.textContent = `v${data.version}`;
+    }
+  } catch (_) {}
+
+  try {
+    const st = await request('/api/whatsapp/status', { method: 'GET' });
+    if (st && st.state) {
+      setStatus(st.state);
     }
   } catch (_) {}
 })();

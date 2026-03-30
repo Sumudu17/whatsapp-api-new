@@ -2,15 +2,19 @@ import { NextFunction, Request, Response } from "express";
 import {
   changeName,
   changePassword,
+  completePasswordReset,
+  FORGOT_PASSWORD_PUBLIC_MESSAGE,
   getMe,
   loginUser,
   registerUser,
   logoutUser,
+  requestPasswordReset,
   resendRegisterActivationOtp,
   requestChangeEmailOtp,
   verifyChangeEmailOtp,
   verifyRegisterActivationOtp,
 } from "../services/auth.service";
+import { isAdminEmail } from "../utils/admin";
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -52,6 +56,30 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const { email, password } = req.body as { email: string; password: string };
     const auth = await loginUser({ email, password });
     (req as any).session.user = auth;
+    return res.json({ success: true });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body as { email: string };
+    await requestPasswordReset({ email });
+    return res.json({ success: true, message: FORGOT_PASSWORD_PUBLIC_MESSAGE });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, otp, newPassword } = req.body as {
+      email: string;
+      otp: string;
+      newPassword: string;
+    };
+    await completePasswordReset({ email, otp, newPassword });
     return res.json({ success: true });
   } catch (err) {
     return next(err);
@@ -137,7 +165,8 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
     const sessionUser: any = (req as any).session.user;
     const userId = sessionUser.userId as number;
     const data = await getMe(userId);
-    return res.json({ success: true, user: data });
+    const isAdmin = isAdminEmail(data.email);
+    return res.json({ success: true, user: { ...data, isAdmin } });
   } catch (err) {
     return next(err);
   }
