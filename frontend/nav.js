@@ -42,6 +42,7 @@
     el.outerHTML = (await r.text()).trim();
   };
 
+
   const renderPublic = () => {
     const brand = document.getElementById("navBrandLink");
     if (brand) brand.setAttribute("href", "/login");

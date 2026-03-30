@@ -17,7 +17,6 @@
       <header class="header">
         <div>
           <h1>Profile</h1>
-          <span id="versionText" class="version-badge">v1.0.0</span>
         </div>
       </header>
 
@@ -129,7 +128,17 @@
         try {
           const v = await request("/api/version", { method: "GET" });
           if (v?.version) {
-            document.getElementById("versionText").textContent = `v${v.version}`;
+            const setFooterVersionText = (version, attempts = 0) => {
+              const el = document.getElementById("footerVersionText");
+              if (el) {
+                el.textContent = `v${version}`;
+                el.style.display = "inline-block";
+                return;
+              }
+              if (attempts >= 10) return;
+              setTimeout(() => setFooterVersionText(version, attempts + 1), 200);
+            };
+            setFooterVersionText(v.version);
           }
         } catch (_) {}
 

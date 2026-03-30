@@ -1,7 +1,6 @@
 const statusText = document.getElementById("statusText");
 const clientStateText = document.getElementById("clientStateText");
 const serverStatus = document.getElementById("serverStatus");
-const versionText = document.getElementById("versionText");
 const qrImage = document.getElementById("qrImage");
 const qrHint = document.getElementById("qrHint");
 const initBtn = document.getElementById("initBtn");
@@ -24,6 +23,17 @@ const clientDetailsBox = document.getElementById("clientDetailsBox");
 const clientPushname = document.getElementById("clientPushname");
 const clientWid = document.getElementById("clientWid");
 const clientPhone = document.getElementById("clientPhone");
+
+const setFooterVersionText = (version, attempts = 0) => {
+  const el = document.getElementById("footerVersionText");
+  if (el) {
+    el.textContent = `v${version}`;
+    el.style.display = "inline-block";
+    return;
+  }
+  if (attempts >= 10) return;
+  setTimeout(() => setFooterVersionText(version, attempts + 1), 200);
+};
 
 const applyClientDetails = (state) => {
   const ci = state?.clientInfo;
@@ -203,7 +213,7 @@ destRadios.forEach((radio) => {
   try {
     const data = await request("/api/version");
     if (data.version) {
-      versionText.textContent = `v${data.version}`;
+      setFooterVersionText(data.version);
     }
   } catch (err) {
     console.warn("Failed to load version:", err);

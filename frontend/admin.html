@@ -21,6 +21,7 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 14px;
+        font-family: Arial, Helvetica, sans-serif;
       }
       #adminTableCard {
         width: 100%;
@@ -40,8 +41,8 @@
         background: #fafbfc;
       }
       .cell-mono {
-        font-family: ui-monospace, monospace;
-        font-size: 13px;
+        font-family: inherit;
+        font-size: 14px;
         word-break: break-word;
       }
       .badge {
@@ -73,12 +74,15 @@
           <header class="header">
             <div>
               <h1>Admin</h1>
-              <span id="versionText" class="version-badge">v1.0.0</span>
             </div>
           </header>
 
+          <div class="mt-2">
+            <span id="versionText" class="version-badge">v1.0.0</span>
+          </div>
+
           <p class="info" style="margin-top: 0">
-            Accounts and WhatsApp session status. <strong>Live status</strong> is the in-memory client state; <strong>DB status</strong> is the last value persisted to MySQL.
+            Accounts and WhatsApp session status.
           </p>
 
           <p id="adminError" class="error hidden"></p>
@@ -156,7 +160,8 @@
         try {
           const v = await request("/api/version");
           if (v?.version) {
-            document.getElementById("versionText").textContent = `v${v.version}`;
+            const el = document.getElementById("versionText");
+            if (el) el.textContent = `v${v.version}`;
           }
         } catch (_) {}
 

@@ -3,6 +3,7 @@ import { ApiError } from "../middlewares/error.middleware";
 import { sha256Hex } from "../utils/crypto";
 import {
   createApiKeyRow,
+  findNonDeletedApiKeyNameForUser,
   findActiveApiKeyForUser,
   listApiKeysByUserId,
   revokeApiKeyRow,
@@ -15,8 +16,21 @@ export const listKeys = async (userId: number) => {
 };
 
 export const createKey = async (userId: number, name: string) => {
+  const existing = await findNonDeletedApiKeyNameForUser({ userId, name });
+  if (existing) {
+    throw new ApiError(409, "API key name already exists");
+  }
+
   // Opaque raw key returned once; never stored raw.
-  const rawKey = crypto.randomBytes(32).toString("base64url");
+  // Generate a simple alphanumeric key (no symbols like '-' '_' at all).
+  // Requirement: first/last must also be alphanumeric.
+  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const keyLength = 44;
+  const random = crypto.randomBytes(keyLength);
+  let rawKey = "";
+  for (const b of random) {
+    rawKey += charset[b % charset.length];
+  }
   const apiKeyHash = sha256Hex(rawKey);
   const keyPrefix = rawKey.slice(0, 10);
 

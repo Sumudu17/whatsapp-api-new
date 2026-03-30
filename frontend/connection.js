@@ -143,8 +143,17 @@ waLogoutBtn.addEventListener('click', async () => {
   try {
     const data = await request('/api/version', { method: 'GET' });
     if (data.version) {
-      const versionText = document.getElementById('versionText');
-      if (versionText) versionText.textContent = `v${data.version}`;
+      const setFooterVersionText = (version, attempts = 0) => {
+        const el = document.getElementById('footerVersionText');
+        if (el) {
+          el.textContent = `v${version}`;
+          el.style.display = 'inline-block';
+          return;
+        }
+        if (attempts >= 10) return;
+        setTimeout(() => setFooterVersionText(version, attempts + 1), 200);
+      };
+      setFooterVersionText(data.version);
     }
   } catch (_) {}
 
