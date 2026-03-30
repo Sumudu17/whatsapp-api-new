@@ -1,5 +1,8 @@
 import { listAllAccountsWithWhatsApp } from "../db/admin.repo";
 import { getAllStates } from "../whatsapp/state";
+import { ApiError } from "../middlewares/error.middleware";
+import { deleteUserById } from "../db/auth.repo";
+import { destroyClient, clearWhatsAppSessionFromDisk } from "../whatsapp/client";
 
 export type AdminAccountRow = {
   userId: number;
@@ -48,4 +51,31 @@ export const getAdminAccountsOverview = async (): Promise<AdminAccountRow[]> => 
       sessionUpdatedAt: iso(row.session_updated_at),
     };
   });
+};
+
+export const deleteUserPermanentlyAsAdmin = async (params: {
+  actorUserId: number;
+  targetUserId: number;
+}) => {
+  if (!Number.isFinite(params.targetUserId) || params.targetUserId <= 0) {
+    throw new ApiError(400, "Invalid userId");
+  }
+  if (params.actorUserId === params.targetUserId) {
+    throw new ApiError(400, "You cannot delete your own admin account");
+  }
+
+  // Best-effort: stop runtime client + clear LocalAuth session directory.
+  try {
+    await destroyClient(params.targetUserId, true);
+  } catch (_) {}
+  try {
+    clearWhatsAppSessionFromDisk(params.targetUserId);
+  } catch (_) {}
+
+  const affected = await deleteUserById(params.targetUserId);
+  if (!affected) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return { deletedUserId: params.targetUserId };
 };

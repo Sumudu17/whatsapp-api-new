@@ -103,6 +103,12 @@ export const setUserPasswordHash = async (userId: number, passwordHash: string) 
   await pool.query(`UPDATE users SET password_hash = ? WHERE id = ?`, [passwordHash, userId]);
 };
 
+export const deleteUserById = async (userId: number) => {
+  const pool = getPool();
+  const [result] = await pool.query(`DELETE FROM users WHERE id = ? LIMIT 1`, [userId]);
+  return (result as any).affectedRows as number;
+};
+
 export const createWhatsAppSessionRow = async (params: {
   userId: number;
   clientId: string;

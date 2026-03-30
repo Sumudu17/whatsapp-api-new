@@ -8,6 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
     <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
       .admin-table-wrap {
         overflow-x: auto;
@@ -102,6 +103,7 @@
                     <th>Client Phone</th>
                     <th>Last error (live)</th>
                     <th>Last disconnect (DB)</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="adminTbody"></tbody>
@@ -124,6 +126,13 @@
           headers: { "Content-Type": "application/json", ...(options.headers || {}) },
         });
         const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          // Session expired or cookie not present: send user back to login.
+          window.location.href = "/login";
+          const err = new Error("Unauthorized");
+          /** @type {any} */ (err).status = 401;
+          throw err;
+        }
         if (!res.ok) {
           const err = new Error(data.error || "Request failed");
           /** @type {any} */ (err).status = res.status;
@@ -151,19 +160,81 @@
         return t.length > max ? t.slice(0, max) + "…" : t;
       };
 
-      (async () => {
-        const errEl = document.getElementById("adminError");
-        const loadingEl = document.getElementById("adminLoading");
-        const tableCard = document.getElementById("adminTableCard");
-        const tbody = document.getElementById("adminTbody");
+      const toast = (icon, text, timer = 2200) => {
+        return Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon,
+          title: text,
+          showConfirmButton: false,
+          timer,
+          timerProgressBar: true,
+        });
+      };
 
+      const bindDeleteButtons = ({ actorUserId }) => {
+        const btns = Array.from(document.querySelectorAll(".admin-delete-user-btn"));
+        for (const btn of btns) {
+          btn.addEventListener("click", async () => {
+            const userId = Number(btn.getAttribute("data-user-id"));
+            const email = btn.getAttribute("data-email") || "";
+            const name = btn.getAttribute("data-name") || "";
+
+            if (!Number.isFinite(userId) || userId <= 0) return;
+            if (actorUserId && userId === actorUserId) {
+              await toast("warning", "You cannot delete your own admin account.");
+              return;
+            }
+
+            const result = await Swal.fire({
+              title: "Delete this user?",
+              html: `<div style="text-align:left;">
+                <div><strong>User ID:</strong> ${esc(userId)}</div>
+                <div><strong>Name:</strong> ${esc(name || "—")}</div>
+                <div><strong>Email:</strong> ${esc(email || "—")}</div>
+                <div class="mt-2">This will permanently delete the user and remove WhatsApp session files from disk.</div>
+              </div>`,
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonText: "Yes, delete",
+              cancelButtonText: "Cancel",
+              confirmButtonColor: "#dc3545",
+              reverseButtons: true,
+              focusCancel: true,
+            });
+
+            if (!result.isConfirmed) return;
+
+            try {
+              await request(`/api/admin/users/${userId}`, { method: "DELETE" });
+              await toast("success", "User deleted.");
+              await loadAccounts();
+            } catch (e) {
+              await toast("error", e.message || "Delete failed");
+            }
+          });
+        }
+      };
+
+      const getActorUserId = async () => {
         try {
-          const v = await request("/api/version");
-          if (v?.version) {
-            const el = document.getElementById("versionText");
-            if (el) el.textContent = `v${v.version}`;
-          }
-        } catch (_) {}
+          const me = await request("/api/auth/me");
+          return Number(me?.user?.id) || null;
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const errEl = document.getElementById("adminError");
+      const loadingEl = document.getElementById("adminLoading");
+      const tableCard = document.getElementById("adminTableCard");
+      const tbody = document.getElementById("adminTbody");
+      let actorUserId = null;
+
+      const loadAccounts = async () => {
+        errEl.classList.add("hidden");
+        tableCard.classList.add("hidden");
+        loadingEl.classList.remove("hidden");
 
         try {
           const data = await request("/api/admin/accounts");
@@ -183,10 +254,22 @@
                 <td class="cell-mono">${esc(a.clientPhoneNumber || "—")}</td>
                 <td class="cell-mono">${esc(short(a.liveLastError, 200))}</td>
                 <td class="cell-mono">${esc(short(a.lastDisconnectedReason, 200))}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn-danger btn-sm admin-delete-user-btn"
+                    data-user-id="${a.userId}"
+                    data-email="${esc(a.email)}"
+                    data-name="${esc(a.name)}"
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>`;
             })
             .join("");
           tableCard.classList.remove("hidden");
+          bindDeleteButtons({ actorUserId });
         } catch (e) {
           loadingEl.classList.add("hidden");
           const st = /** @type {any} */ (e).status;
@@ -196,6 +279,21 @@
               : e.message || "Failed to load";
           errEl.classList.remove("hidden");
         }
+
+        return undefined;
+      };
+
+      (async () => {
+        try {
+          const v = await request("/api/version");
+          if (v?.version) {
+            const el = document.getElementById("versionText");
+            if (el) el.textContent = `v${v.version}`;
+          }
+        } catch (_) {}
+
+        actorUserId = await getActorUserId();
+        await loadAccounts();
       })();
     </script>
   </body>
