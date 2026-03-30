@@ -1,5 +1,5 @@
 import { getAllStates } from "./state";
-import { sendAlertEmail } from "../services/email.service";
+import { notifyWhatsAppNotReady } from "../services/notReadyAlert.service";
 
 const notReadySinceByUserId = new Map<number, number>();
 const alertSentByUserId = new Set<number>();
@@ -8,7 +8,7 @@ export const startWhatsAppMonitor = () => {
   const intervalMs = 30 * 1000;
   const thresholdMs = 5 * 60 * 1000;
 
-  setInterval(async () => {
+  setInterval(() => {
     const now = Date.now();
 
     const allStates = getAllStates();
@@ -29,14 +29,7 @@ export const startWhatsAppMonitor = () => {
       const notReadySince = notReadySinceByUserId.get(userId)!;
       if (!alertSentByUserId.has(userId) && now - notReadySince >= thresholdMs) {
         alertSentByUserId.add(userId);
-        try {
-          await sendAlertEmail(
-            "WhatsApp client not ready",
-            `WhatsApp client for userId=${userId} has been ${status} for more than 5 minutes.`
-          );
-        } catch {
-          // error already logged by email service
-        }
+        notifyWhatsAppNotReady({ userId, status }).catch(() => {});
       }
     }
   }, intervalMs);

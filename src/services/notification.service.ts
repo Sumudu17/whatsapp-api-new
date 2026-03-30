@@ -1,8 +1,10 @@
 import { createNotificationEvent } from "../db/notification.repo";
 import { getUserPublicById } from "../db/auth.repo";
+import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { sendEmail } from "./email.service";
 import { sha256Hex } from "../utils/crypto";
 import { logger } from "../utils/logger";
+import { getAdminNotificationEmails } from "../utils/admin";
 
 const getBucketKeyDaily = (d: Date) => {
   const yyyy = d.getUTCFullYear();
@@ -22,6 +24,9 @@ export const notifyWhatsAppDisconnect = async (params: {
     return;
   }
 
+  const sessionRow = await getWhatsappSessionByUserId(params.userId);
+  const clientId = sessionRow?.client_id ?? "(none)";
+
   const now = new Date();
   const reasonHash = sha256Hex(params.reason).slice(0, 12);
   const bucket = getBucketKeyDaily(now);
@@ -38,7 +43,6 @@ export const notifyWhatsAppDisconnect = async (params: {
     return; // already notified in the bucket window
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL;
   const userSubject = "WhatsApp disconnected - reconnect required";
   const userText = [
     `Hi ${user.name},`,
@@ -49,10 +53,18 @@ export const notifyWhatsAppDisconnect = async (params: {
     `Please reconnect in your dashboard.`,
   ].join("\n");
 
-  const adminSubject = "User WhatsApp disconnected";
+  const adminSubject =
+    params.eventType === "whatsapp_auth_failure"
+      ? "User WhatsApp auth failure"
+      : "User WhatsApp disconnected";
   const adminText = [
-    `A WhatsApp session was disconnected.`,
-    `User: ${user.name} (userId=${user.id}, email=${user.email})`,
+    `A WhatsApp session reported a problem.`,
+    ``,
+    `Account name: ${user.name}`,
+    `User ID: ${user.id}`,
+    `Email: ${user.email}`,
+    `Client ID: ${clientId}`,
+    `Event: ${params.eventType}`,
     `Reason: ${params.reason}`,
     `Time: ${now.toISOString()}`,
   ].join("\n");
@@ -63,11 +75,13 @@ export const notifyWhatsAppDisconnect = async (params: {
     logger.warn({ err, userId: params.userId }, "Failed to send user email notification");
   }
 
-  if (adminEmail) {
+  const adminRecipients = getAdminNotificationEmails();
+  for (const to of adminRecipients) {
     try {
-      await sendEmail(adminEmail, adminSubject, adminText);
+      // eslint-disable-next-line no-await-in-loop
+      await sendEmail(to, adminSubject, adminText);
     } catch (err) {
-      logger.warn({ err }, "Failed to send admin email notification");
+      logger.warn({ err, to }, "Failed to send admin email notification");
     }
   }
 };

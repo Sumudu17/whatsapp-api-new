@@ -33,6 +33,25 @@ export const listApiKeysByUserId = async (userId: number) => {
   return rows as any as ApiKeyListItem[];
 };
 
+export const findNonDeletedApiKeyNameForUser = async (params: {
+  userId: number;
+  name: string;
+}): Promise<{ id: number } | null> => {
+  const pool = getPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT id
+     FROM api_keys
+     WHERE user_id = ?
+       AND name = ?
+       AND status != 'DELETED'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [params.userId, params.name]
+  );
+  const row = rows[0] as any;
+  return row?.id ? { id: row.id as number } : null;
+};
+
 export const findActiveApiKeyForUser = async (params: {
   userId: number;
   apiKeyHash: string;

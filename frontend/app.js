@@ -1,15 +1,10 @@
 const statusText = document.getElementById("statusText");
 const clientStateText = document.getElementById("clientStateText");
 const serverStatus = document.getElementById("serverStatus");
-const versionText = document.getElementById("versionText");
 const qrImage = document.getElementById("qrImage");
 const qrHint = document.getElementById("qrHint");
 const initBtn = document.getElementById("initBtn");
 const waLogoutBtn = document.getElementById("waLogoutBtn");
-const appLogoutBtn = document.getElementById("appLogoutBtn");
-const apiBtn = document.getElementById("apiBtn");
-const profileBtn = document.getElementById("profileBtn");
-const connectionBtn = document.getElementById("connectionBtn");
 const lastErrorText = document.getElementById("lastErrorText");
 const sendBtn = document.getElementById("sendBtn");
 const refreshGroupsBtn = document.getElementById("refreshGroupsBtn");
@@ -24,11 +19,42 @@ const destRadios = document.querySelectorAll("input[name=\"destType\"]");
 const socket = io({ withCredentials: true });
 let socketConnected = false;
 
+const clientDetailsBox = document.getElementById("clientDetailsBox");
+const clientPushname = document.getElementById("clientPushname");
+const clientWid = document.getElementById("clientWid");
+const clientPhone = document.getElementById("clientPhone");
+
+const setFooterVersionText = (version, attempts = 0) => {
+  const el = document.getElementById("footerVersionText");
+  if (el) {
+    el.textContent = `v${version}`;
+    el.style.display = "inline-block";
+    return;
+  }
+  if (attempts >= 10) return;
+  setTimeout(() => setFooterVersionText(version, attempts + 1), 200);
+};
+
+const applyClientDetails = (state) => {
+  const ci = state?.clientInfo;
+  const show = state?.status === "READY" && ci;
+  if (!clientDetailsBox) return;
+  if (show) {
+    clientDetailsBox.classList.remove("hidden");
+    if (clientPushname) clientPushname.textContent = ci.pushname || "—";
+    if (clientWid) clientWid.textContent = ci.widSerialized || "—";
+    if (clientPhone) clientPhone.textContent = ci.phoneNumber || "—";
+  } else {
+    clientDetailsBox.classList.add("hidden");
+  }
+};
+
 const setStatus = (state) => {
   if (!state) return;
   serverStatus.classList.add("hidden");
   statusText.textContent = state.status || "UNKNOWN";
   clientStateText.textContent = state.clientState || "-";
+  applyClientDetails(state);
 
   if (lastErrorText) {
     if (state.lastError) {
@@ -73,6 +99,7 @@ socket.on("disconnect", () => {
   serverStatus.classList.remove("hidden");
   statusText.textContent = "SERVER_OFFLINE";
   clientStateText.textContent = "-";
+  applyClientDetails({ status: "DISCONNECTED" });
   qrImage.removeAttribute("src");
   qrImage.classList.add("hidden");
   qrHint.classList.remove("hidden");
@@ -83,6 +110,7 @@ socket.on("connect_error", () => {
   serverStatus.classList.remove("hidden");
   statusText.textContent = "SERVER_OFFLINE";
   clientStateText.textContent = "-";
+  applyClientDetails({ status: "DISCONNECTED" });
   qrImage.removeAttribute("src");
   qrImage.classList.add("hidden");
   qrHint.classList.remove("hidden");
@@ -91,6 +119,7 @@ socket.on("connect_error", () => {
 const request = async (url, options = {}) => {
   const res = await fetch(url, {
     ...options,
+    credentials: "include",
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
   });
@@ -117,23 +146,6 @@ waLogoutBtn.addEventListener("click", async () => {
   } catch (err) {
     alert(err.message);
   }
-});
-
-appLogoutBtn.addEventListener("click", async () => {
-  await request("/api/auth/logout", { method: "POST" });
-  window.location.href = "/login";
-});
-
-apiBtn.addEventListener("click", async () => {
-  window.location.href = "/api";
-});
-
-profileBtn.addEventListener("click", async () => {
-  window.location.href = "/profile";
-});
-
-connectionBtn.addEventListener("click", async () => {
-  window.location.href = "/connection";
 });
 
 const loadGroups = async () => {
@@ -201,10 +213,19 @@ destRadios.forEach((radio) => {
   try {
     const data = await request("/api/version");
     if (data.version) {
-      versionText.textContent = `v${data.version}`;
+      setFooterVersionText(data.version);
     }
   } catch (err) {
     console.warn("Failed to load version:", err);
+  }
+
+  try {
+    const st = await request("/api/whatsapp/status");
+    if (st?.state) {
+      setStatus(st.state);
+    }
+  } catch (err) {
+    console.warn("Failed to load WhatsApp status:", err);
   }
 })();
 

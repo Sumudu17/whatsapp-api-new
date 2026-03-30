@@ -78,6 +78,22 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(72),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email(),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: z.string().trim().email(),
+    otp: z.string().trim().regex(/^\d{6}$/, "code must be 6 digits"),
+    newPassword: z.string().min(8).max(72),
+    confirmPassword: z.string().min(8).max(72),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const createApiKeySchema = z.object({
   name: z.string().trim().min(1).max(100),
 });

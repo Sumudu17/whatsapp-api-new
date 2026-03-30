@@ -49,7 +49,7 @@ sudo apt-get install -y ca-certificates fonts-liberation libappindicator3-1 liba
    - `SMTP_FROM` (optional, defaults to `SMTP_USER`)
    - `ALERT_EMAIL_TO` (required for alerts)
    - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (legacy `MYSQL_*` still supported if `DB_*` is unset)
-   - `ADMIN_EMAIL` (admin notifications on disconnect)
+   - `ADMIN_EMAIL` and optional comma-separated `ADMIN_EMAILS` (disconnect alerts + access to `/admin` and `GET /api/admin/accounts`)
 
    - `OTP_PEPPER` (recommended), `OTP_EXPIRES_MINUTES`, `OTP_RESEND_MIN_SECONDS`, `OTP_MAX_INVALID_ATTEMPTS`
 
@@ -70,11 +70,13 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - Visit `http://localhost:4000/login`
 - Register at `http://localhost:4000/register`
 - Verify your email OTP at `http://localhost:4000/verify-email?email=...`
+- Forgot password: `http://localhost:4000/forgot-password` → then `http://localhost:4000/reset-password?email=...`
 - After login, open:
   - `http://localhost:4000/` (dashboard)
   - `http://localhost:4000/connection` (QR + connection status)
   - `http://localhost:4000/api` (API key management)
   - `http://localhost:4000/profile` (name/email/password)
+  - `http://localhost:4000/admin` (all accounts + WhatsApp status; only if your email is listed in `ADMIN_EMAIL` or `ADMIN_EMAILS` in `.env`)
 
 ### API Endpoints
 - `GET /api/health`
@@ -83,8 +85,11 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - `POST /api/auth/verify-email-otp`
 - `POST /api/auth/resend-email-otp`
 - `POST /api/auth/login` (session cookie)
+- `POST /api/auth/forgot-password` (public; sends reset code if email matches an active account)
+- `POST /api/auth/reset-password` (public; code + new password)
 - `POST /api/auth/logout`
-- `GET /api/auth/me` (session)
+- `GET /api/auth/me` (session; includes `user.isAdmin` when email matches `ADMIN_EMAIL` / `ADMIN_EMAILS`)
+- `GET /api/admin/accounts` (session; **admin only** — lists users and DB + live WhatsApp status)
 - `POST /api/auth/change-name` (session)
 - `POST /api/auth/change-email/request-otp` (session)
 - `POST /api/auth/change-email/verify-otp` (session)
@@ -253,6 +258,38 @@ Response: `{ "success": true }`
 
 Response: `{ "success": true }` (session cookie set by server)
 
+#### Forgot password (request code)
+`POST /api/auth/forgot-password`
+
+```
+{
+  "email": "example.user1@example.com"
+}
+```
+
+Response (always the same message to avoid email enumeration):
+
+```
+{
+  "success": true,
+  "message": "If an account exists for that email, a reset code will be sent shortly."
+}
+```
+
+#### Reset password (code + new password)
+`POST /api/auth/reset-password`
+
+```
+{
+  "email": "example.user1@example.com",
+  "otp": "123456",
+  "newPassword": "NewSecurePassword1",
+  "confirmPassword": "NewSecurePassword1"
+}
+```
+
+Response: `{ "success": true }` — then log in at `/login`.
+
 ### API Keys Payloads
 
 #### List keys
@@ -305,7 +342,8 @@ Response: `{ "success": true }`
 - `state_change`
 
 ### Email Alerts
-- If WhatsApp status is not `READY` for more than 5 minutes, an alert email is sent.
+- **Disconnect / auth failure:** emails go to the **account owner** and to every address from `ADMIN_EMAIL`, `ADMIN_EMAILS`, and `ALERT_EMAIL_TO` (deduplicated). Admin emails include **account name**, **user id**, **email**, and **client ID** (from `whatsapp_sessions`).
+- **Not ready:** if status stays not `READY` for **more than 5 minutes**, the same recipients get a **not connected** alert (admin body includes **name**, **user id**, **email**, **client ID**, and current status).
 - Check delivery status with: `GET /api/alerts/status`
 - Trigger a test email with: `POST /api/alerts/test`
 

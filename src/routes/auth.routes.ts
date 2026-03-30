@@ -2,24 +2,29 @@ import { Router } from "express";
 import {
   changeUserName,
   changeUserPassword,
+  forgotPassword,
   login,
   logout,
   register,
   requestEmailChangeOtp,
   resendEmailOtp,
+  resetPassword,
   verifyEmailChangeOtp,
   verifyEmailOtp,
   me,
 } from "../controllers/auth.controller";
 import { validateBody } from "../middlewares/validate.middleware";
 import { requireAuth } from "../middlewares/auth.middleware";
+import { rateLimitForgotPassword, rateLimitResetPassword } from "../middlewares/rateLimit.middleware";
 import {
   changeNameSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
   requestChangeEmailSchema,
   resendEmailOtpSchema,
+  resetPasswordSchema,
   verifyChangeEmailOtpSchema,
   verifyEmailOtpSchema,
 } from "../utils/validators";
@@ -30,6 +35,18 @@ router.post("/register", validateBody(registerSchema), register);
 router.post("/verify-email-otp", validateBody(verifyEmailOtpSchema), verifyEmailOtp);
 router.post("/resend-email-otp", validateBody(resendEmailOtpSchema), resendEmailOtp);
 router.post("/login", validateBody(loginSchema), login);
+router.post(
+  "/forgot-password",
+  rateLimitForgotPassword,
+  validateBody(forgotPasswordSchema),
+  forgotPassword
+);
+router.post(
+  "/reset-password",
+  rateLimitResetPassword,
+  validateBody(resetPasswordSchema),
+  resetPassword
+);
 
 router.post("/logout", logout);
 

@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import authRoutes from "./routes/auth.routes";
+import adminRoutes from "./routes/admin.routes";
 import apiKeysRoutes from "./routes/apiKeys.routes";
 import alertsRoutes from "./routes/alerts.routes";
 import whatsappRoutes from "./routes/whatsapp.routes";
@@ -74,10 +75,14 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
       req.path === "/login" ||
       req.path === "/register" ||
       req.path === "/verify-email" ||
+      req.path === "/forgot-password" ||
+      req.path === "/reset-password" ||
       req.path.startsWith("/api/auth/login") ||
       req.path.startsWith("/api/auth/register") ||
       req.path.startsWith("/api/auth/verify-email-otp") ||
       req.path.startsWith("/api/auth/resend-email-otp") ||
+      req.path.startsWith("/api/auth/forgot-password") ||
+      req.path.startsWith("/api/auth/reset-password") ||
       req.path === "/api/health" ||
       req.path === "/api/version" ||
       req.path.startsWith("/styles.css") ||
@@ -126,6 +131,14 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
     res.sendFile(path.join(frontendPath, "verify-email.html"));
   });
 
+  app.get("/forgot-password", (_req, res) => {
+    res.sendFile(path.join(frontendPath, "forgot-password.html"));
+  });
+
+  app.get("/reset-password", (_req, res) => {
+    res.sendFile(path.join(frontendPath, "reset-password.html"));
+  });
+
   app.get("/api", (_req, res) => {
     res.sendFile(path.join(frontendPath, "api-keys.html"));
   });
@@ -141,6 +154,10 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
 
   app.get("/connection", (_req, res) => {
     res.sendFile(path.join(frontendPath, "connection.html"));
+  });
+
+  app.get("/admin", (_req, res) => {
+    res.sendFile(path.join(frontendPath, "admin.html"));
   });
 
   app.get("/", (req, res) => {
@@ -183,6 +200,7 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
   });
 
   app.use("/api/auth", authRoutes);
+  app.use("/api/admin", adminRoutes);
   app.use("/api/api-keys", apiKeysRoutes);
   app.use("/api/alerts", alertsRoutes);
   app.use("/api/whatsapp", whatsappRoutes);
