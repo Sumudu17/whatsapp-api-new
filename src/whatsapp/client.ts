@@ -34,6 +34,14 @@ const clearSessionDirForUser = (userId: number) => {
   }
 };
 
+/**
+ * Permanently remove LocalAuth session files from disk.
+ * Safe to call even when no runtime client exists.
+ */
+export const clearWhatsAppSessionFromDisk = (userId: number) => {
+  return clearSessionDirForUser(userId);
+};
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const clearSessionLockFiles = (userId: number) => {
