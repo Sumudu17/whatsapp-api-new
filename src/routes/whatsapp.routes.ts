@@ -2,12 +2,12 @@ import { Router } from "express";
 import {
   groups,
   connection,
+  dashboardStatus,
   sendByApiKey,
   statusByApiKey,
   initialize,
   logout,
   send,
-  status,
 } from "../controllers/whatsapp.controller";
 import { requireAuth } from "../middlewares/auth.middleware";
 import { rateLimitSend } from "../middlewares/rateLimit.middleware";
@@ -20,7 +20,7 @@ const router = Router();
 router.post("/initialize", requireAuth, initialize);
 router.post("/logout", requireAuth, logout);
 router.get("/connection", requireAuth, connection);
-router.get("/status", requireAuth, status);
+router.get("/dashboard-status", requireAuth, dashboardStatus);
 // API-key status endpoint (same path, POST method)
 router.post("/status", validateBody(statusByApiKeySchema), statusByApiKey);
 router.get("/groups", requireAuth, groups);

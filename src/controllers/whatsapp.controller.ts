@@ -58,6 +58,19 @@ export const connection = async (req: Request, res: Response, next: NextFunction
   }
 };
 
+/**
+ * Internal dashboard endpoint (session-auth) for status widgets and page load state.
+ */
+export const dashboardStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getSessionUserId(req);
+    const connection = await getWhatsAppConnection(userId);
+    return res.json({ success: true, connection });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const groups = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = getSessionUserId(_req);

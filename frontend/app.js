@@ -220,9 +220,9 @@ destRadios.forEach((radio) => {
   }
 
   try {
-    const st = await request("/api/whatsapp/status");
-    if (st?.state) {
-      setStatus(st.state);
+    const st = await request("/api/whatsapp/dashboard-status");
+    if (st?.connection) {
+      setStatus(st.connection);
     }
   } catch (err) {
     console.warn("Failed to load WhatsApp status:", err);

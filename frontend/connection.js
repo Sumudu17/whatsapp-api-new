@@ -158,9 +158,9 @@ waLogoutBtn.addEventListener('click', async () => {
   } catch (_) {}
 
   try {
-    const st = await request('/api/whatsapp/status', { method: 'GET' });
-    if (st && st.state) {
-      setStatus(st.state);
+    const st = await request('/api/whatsapp/dashboard-status', { method: 'GET' });
+    if (st && st.connection) {
+      setStatus(st.connection);
     }
   } catch (_) {}
 })();
