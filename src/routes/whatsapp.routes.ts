@@ -3,6 +3,7 @@ import {
   groups,
   connection,
   sendByApiKey,
+  statusByApiKey,
   initialize,
   logout,
   send,
@@ -11,7 +12,7 @@ import {
 import { requireAuth } from "../middlewares/auth.middleware";
 import { rateLimitSend } from "../middlewares/rateLimit.middleware";
 import { validateBody } from "../middlewares/validate.middleware";
-import { sendByApiKeySchema, sendSchema } from "../utils/validators";
+import { sendByApiKeySchema, sendSchema, statusByApiKeySchema } from "../utils/validators";
 
 const router = Router();
 
@@ -20,6 +21,8 @@ router.post("/initialize", requireAuth, initialize);
 router.post("/logout", requireAuth, logout);
 router.get("/connection", requireAuth, connection);
 router.get("/status", requireAuth, status);
+// API-key status endpoint (same path, POST method)
+router.post("/status", validateBody(statusByApiKeySchema), statusByApiKey);
 router.get("/groups", requireAuth, groups);
 
 // Unified send endpoint:
@@ -38,5 +41,6 @@ router.post("/send", requireAuth, rateLimitSend, validateBody(sendSchema), send)
 
 // Backwards-compatible alias (deprecated): keep for older clients
 router.post("/send-api-key", validateBody(sendByApiKeySchema), sendByApiKey);
+router.post("/status-api-key", validateBody(statusByApiKeySchema), statusByApiKey);
 
 export default router;
