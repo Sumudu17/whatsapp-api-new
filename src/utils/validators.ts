@@ -45,6 +45,11 @@ export const sendByApiKeySchema = z
     path: ["phoneNumber"],
   });
 
+export const statusByApiKeySchema = z.object({
+  userId: z.number().int().positive(),
+  apiKey: z.string().trim().min(16),
+});
+
 export const registerSchema = z.object({
   name: z.string().trim().min(1).max(100),
   email: z.string().trim().email(),

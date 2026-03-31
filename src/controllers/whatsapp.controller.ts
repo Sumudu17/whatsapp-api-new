@@ -135,3 +135,47 @@ export const sendByApiKey = async (req: Request, res: Response, next: NextFuncti
     next(err);
   }
 };
+
+const statusMessageByCode: Record<string, string> = {
+  READY: "Client is ready",
+  NOT_INITIALIZED: "Client is not initialized",
+  INITIALIZING: "Client is initializing",
+  QR_REQUIRED: "Client is waiting for QR scan",
+  AUTHENTICATED: "Client is authenticated",
+  DISCONNECTED: "Client is disconnected",
+};
+
+export const statusByApiKey = async (req: Request, res: Response) => {
+  try {
+    const { userId, apiKey } = req.body as { userId: number; apiKey: string };
+    await validateActiveKey({ userId, apiKey });
+
+    const state = getWhatsAppStatus(userId);
+    const clientStatusCode = state.status;
+    const message =
+      statusMessageByCode[clientStatusCode] ?? "Client status is unavailable";
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      clientStatus: clientStatusCode,
+      message,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Request failed";
+    if (msg === "Invalid API key") {
+      return res.status(401).json({
+        success: false,
+        statusCode: 401,
+        clientStatus: "INVALID_API_KEY",
+        message: "API key is not valid",
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      clientStatus: "UNKNOWN",
+      message: "Failed to check client status",
+    });
+  }
+};

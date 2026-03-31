@@ -104,6 +104,10 @@ body.has-app-shell > #navMount {
   font-size: 1.25rem;
 }
 
+.card h4 {
+  font-size: 1.125rem;
+}
+
 /* Prefer Bootstrap for label/input/button sizing.
    Keep custom CSS only for layout and non-form-specific styling. */
 

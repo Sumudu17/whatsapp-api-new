@@ -83,6 +83,40 @@
                 API endpoint:
                 <code id="endpointUrlPost"></code>
               </p>
+
+              <hr />
+              <p style="margin-top:10px;">
+                Status API endpoint:
+                <code id="endpointStatusUrlPost"></code>
+              </p>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Status Request Example</h4>
+                <pre id="exampleStatusPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Possible Status Values</h4>
+                <ul style="margin: 0; padding-left: 18px;">
+                  <li><code>READY</code> - Client is ready to send/receive messages.</li>
+                  <li><code>NOT_INITIALIZED</code> - Client has not been started yet.</li>
+                  <li><code>INITIALIZING</code> - Client is currently starting up.</li>
+                  <li><code>QR_REQUIRED</code> - QR scan is required to login.</li>
+                  <li><code>AUTHENTICATED</code> - Auth is done, waiting to become fully ready.</li>
+                  <li><code>DISCONNECTED</code> - Client was disconnected.</li>
+                  <li><code>INVALID_API_KEY</code> - API key is not valid (error response case).</li>
+                </ul>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Status Response (Client Ready)</h4>
+                <pre id="statusReadyResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Status Response (Client Not Ready)</h4>
+                <pre id="statusNotReadyResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Status Response (Invalid API Key)</h4>
+                <pre id="statusInvalidKeyResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
             </div>
           </div>
 
@@ -147,6 +181,11 @@
       const groupsStatusText = document.getElementById("groupsStatusText");
       const endpointUrlGet = document.getElementById("endpointUrlGet");
       const endpointUrlPost = document.getElementById("endpointUrlPost");
+      const endpointStatusUrlPost = document.getElementById("endpointStatusUrlPost");
+      const exampleStatusPayloadText = document.getElementById("exampleStatusPayloadText");
+      const statusReadyResponseText = document.getElementById("statusReadyResponseText");
+      const statusNotReadyResponseText = document.getElementById("statusNotReadyResponseText");
+      const statusInvalidKeyResponseText = document.getElementById("statusInvalidKeyResponseText");
 
       let currentUserId = null;
       let lastCreatedRawKey = null;
@@ -155,6 +194,9 @@
       const origin = window.location.origin;
       if (endpointUrlGet) endpointUrlGet.textContent = `${origin}/api/whatsapp/send`;
       if (endpointUrlPost) endpointUrlPost.textContent = `POST ${origin}/api/whatsapp/send`;
+      if (endpointStatusUrlPost) {
+        endpointStatusUrlPost.textContent = `POST ${origin}/api/whatsapp/status`;
+      }
 
       const copyToClipboard = async (text) => {
         try {
@@ -250,8 +292,34 @@
           groupId: "1234567890-123456789@g.us",
           message: "Hello from API (group message)",
         };
+        const statusExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+        };
+        const statusReadyExample = {
+          success: true,
+          statusCode: 200,
+          clientStatus: "READY",
+          message: "Client is ready",
+        };
+        const statusNotReadyExample = {
+          success: true,
+          statusCode: 200,
+          clientStatus: "INITIALIZING",
+          message: "Client is initializing",
+        };
+        const statusInvalidApiKeyExample = {
+          success: false,
+          statusCode: 401,
+          clientStatus: "INVALID_API_KEY",
+          message: "API key is not valid",
+        };
         examplePhonePayloadText.textContent = JSON.stringify(phoneExample, null, 2);
         exampleGroupPayloadText.textContent = JSON.stringify(groupExample, null, 2);
+        exampleStatusPayloadText.textContent = JSON.stringify(statusExample, null, 2);
+        statusReadyResponseText.textContent = JSON.stringify(statusReadyExample, null, 2);
+        statusNotReadyResponseText.textContent = JSON.stringify(statusNotReadyExample, null, 2);
+        statusInvalidKeyResponseText.textContent = JSON.stringify(statusInvalidApiKeyExample, null, 2);
         apiDetailsBox.classList.remove("hidden");
       };
 
