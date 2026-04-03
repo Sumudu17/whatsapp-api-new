@@ -50,6 +50,27 @@ export const statusByApiKeySchema = z.object({
   apiKey: z.string().trim().min(16),
 });
 
+export const fetchMessagesByApiKeySchema = z
+  .object({
+    userId: z.number().int().positive(),
+    apiKey: z.string().trim().min(16),
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(/^\+\d{8,15}$/, "phoneNumber must be E.164 format, e.g. +94717177326")
+      .optional(),
+    groupId: z
+      .string()
+      .trim()
+      .regex(/@g\.us$/, "groupId must end with @g.us")
+      .optional(),
+    limit: z.number().int().min(1).max(100).optional().default(20),
+  })
+  .refine((data) => !!data.phoneNumber !== !!data.groupId, {
+    message: "Either phoneNumber or groupId is required (not both)",
+    path: ["phoneNumber"],
+  });
+
 export const registerSchema = z.object({
   name: z.string().trim().min(1).max(100),
   email: z.string().trim().email(),

@@ -90,6 +90,7 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - `POST /api/auth/logout`
 - `GET /api/auth/me` (session; includes `user.isAdmin` when email matches `ADMIN_EMAIL` / `ADMIN_EMAILS`)
 - `GET /api/admin/accounts` (session; **admin only** — lists users and DB + live WhatsApp status)
+- `DELETE /api/admin/users/:id` (session; **admin only** — deletes user and cleans WhatsApp session files on disk)
 - `POST /api/auth/change-name` (session)
 - `POST /api/auth/change-email/request-otp` (session)
 - `POST /api/auth/change-email/verify-otp` (session)
@@ -101,114 +102,18 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 
 - `POST /api/whatsapp/initialize` (session; triggers QR via WebSocket)
 - `POST /api/whatsapp/logout` (session)
-- `GET /api/whatsapp/status` (session; current in-memory state)
 - `GET /api/whatsapp/connection` (session; state + last disconnect metadata from MySQL)
+- `GET /api/whatsapp/dashboard-status` (session; dashboard UI — connection-style payload)
 - `GET /api/whatsapp/groups` (session; only when state is `READY`)
-
+- `POST /api/whatsapp/status` (**API key** — `userId` + `apiKey`; external client status)
+- `POST /api/whatsapp/messages` (**API key** — `userId` + `apiKey` + XOR `phoneNumber` / `groupId` + optional `limit`; fetch latest messages)
 - `POST /api/whatsapp/send` (session auth or API-key auth; routes through the correct WhatsApp session)
+- `POST /api/whatsapp/send-api-key` (deprecated alias for API-key send)
+- `POST /api/whatsapp/status-api-key` (deprecated alias for API-key status)
 
-### WhatsApp Send Payload (session auth)
-`POST /api/whatsapp/send`
+### External WhatsApp HTTP API
 
-Rules: provide exactly one of `to` or `groupId`.
-
-```
-{
-  "to": "+94717177326",
-  "message": "Hello World"
-}
-```
-
-Example (group):
-
-```
-{
-  "groupId": "12345@g.us",
-  "message": "Hello World"
-}
-```
-
-### WhatsApp Send Payload (API key auth)
-`POST /api/whatsapp/send`
-
-Rules: provide exactly one of `phoneNumber` or `groupId`.
-
-#### Direct number request body
-
-```
-{
-  "userId": 1,
-  "apiKey": "RAW_API_KEY_VALUE",
-  "phoneNumber": "+94717177326",
-  "message": "Hello from API (direct number)"
-}
-```
-
-#### Group message request body
-
-```
-{
-  "userId": 1,
-  "apiKey": "RAW_API_KEY_VALUE",
-  "groupId": "1234567890-123456789@g.us",
-  "message": "Hello from API (group message)"
-}
-```
-
-Response (success):
-
-```
-{
-  "success": true,
-  "messageId": "..."
-}
-```
-
-### Send WhatsApp Message (API examples)
-
-#### 1) Session auth (cookie) - `POST /api/whatsapp/send`
-
-Login (cookie stored in `cookies.txt`):
-
-```
-curl -c cookies.txt -X POST http://localhost:4000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"example.user1@example.com\",\"password\":\"TestPass1234!\"}"
-```
-
-Send to a phone number:
-
-```
-curl -b cookies.txt -X POST http://localhost:4000/api/whatsapp/send \
-  -H "Content-Type: application/json" \
-  -d "{\"to\":\"+94717177326\",\"message\":\"Hello from API (session)\"}"
-```
-
-Send to a group:
-
-```
-curl -b cookies.txt -X POST http://localhost:4000/api/whatsapp/send \
-  -H "Content-Type: application/json" \
-  -d "{\"groupId\":\"12345@g.us\",\"message\":\"Hello from API (session, group)\"}"
-```
-
-#### 2) API key auth - `POST /api/whatsapp/send`
-
-Send to a phone number:
-
-```
-curl -X POST http://localhost:4000/api/whatsapp/send \
-  -H "Content-Type: application/json" \
-  -d "{\"userId\":1,\"apiKey\":\"RAW_API_KEY_VALUE\",\"phoneNumber\":\"+94717177326\",\"message\":\"Hello from API (apikey)\"}"
-```
-
-Send to a group:
-
-```
-curl -X POST http://localhost:4000/api/whatsapp/send \
-  -H "Content-Type: application/json" \
-  -d "{\"userId\":1,\"apiKey\":\"RAW_API_KEY_VALUE\",\"groupId\":\"12345@g.us\",\"message\":\"Hello from API (apikey, group)\"}"
-```
+Request/response examples (JSON bodies, status, send, messages, cURL) are documented in **`docs/WHATSAPP_API.md`**.
 
 ### Auth + OTP Payloads
 
@@ -356,16 +261,9 @@ curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"example.user1@example.com\",\"password\":\"TestPass1234!\"}"
 ```
-```
-curl -X POST http://localhost:4000/api/whatsapp/send \
-  -H "Content-Type: application/json" \
-  -d "{\"to\":\"+94717177326\",\"message\":\"Test message\"}"
-```
-```
-curl -X POST http://localhost:4000/api/whatsapp/send \
-  -H "Content-Type: application/json" \
-  -d "{\"userId\":1,\"apiKey\":\"RAW_API_KEY_VALUE\",\"phoneNumber\":\"+94717177326\",\"message\":\"Hello external\"}"
-```
+
+WhatsApp HTTP API examples (`/api/whatsapp/status`, `/send`, `/messages`): see **`docs/WHATSAPP_API.md`**.
+
 ```
 curl -X POST http://localhost:4000/api/alerts/test \
   -H "Content-Type: application/json" \
