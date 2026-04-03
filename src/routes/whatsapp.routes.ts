@@ -5,6 +5,7 @@ import {
   dashboardStatus,
   sendByApiKey,
   statusByApiKey,
+  messagesByApiKey,
   initialize,
   logout,
   send,
@@ -12,7 +13,12 @@ import {
 import { requireAuth } from "../middlewares/auth.middleware";
 import { rateLimitSend } from "../middlewares/rateLimit.middleware";
 import { validateBody } from "../middlewares/validate.middleware";
-import { sendByApiKeySchema, sendSchema, statusByApiKeySchema } from "../utils/validators";
+import {
+  sendByApiKeySchema,
+  sendSchema,
+  statusByApiKeySchema,
+  fetchMessagesByApiKeySchema,
+} from "../utils/validators";
 
 const router = Router();
 
@@ -23,6 +29,7 @@ router.get("/connection", requireAuth, connection);
 router.get("/dashboard-status", requireAuth, dashboardStatus);
 // API-key status endpoint (same path, POST method)
 router.post("/status", validateBody(statusByApiKeySchema), statusByApiKey);
+router.post("/messages", validateBody(fetchMessagesByApiKeySchema), messagesByApiKey);
 router.get("/groups", requireAuth, groups);
 
 // Unified send endpoint:

@@ -1,6 +1,7 @@
 import { ApiError } from "../middlewares/error.middleware";
 import { getClient, initializeClient, destroyClient } from "../whatsapp/client";
 import { getState } from "../whatsapp/state";
+import { toWhatsAppId } from "../utils/format";
 import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
 
@@ -68,6 +69,155 @@ export const getWhatsAppGroups = async (userId: number) => {
       name: chat.name ?? chat.formattedTitle ?? "Unnamed Group",
       participants: chat.participants?.length ?? 0,
     }));
+};
+
+const formatMessageDateTime = (unixSeconds: number): string => {
+  const d = new Date(unixSeconds * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(
+    d.getMinutes()
+  )}:${p(d.getSeconds())}`;
+};
+
+/**
+ * Map whatsapp-web.js Message to API DTO (no media download).
+ * Resolves sender id (including @lid), pushname, and phone/user id via getContact when possible.
+ */
+export const mapWhatsAppMessageToDtoAsync = async (
+  msg: any,
+  meWid: string | null
+): Promise<Record<string, unknown>> => {
+  const idStr = msg.id?._serialized ?? "";
+  const fromStr =
+    typeof msg.from === "string" ? msg.from : msg.from?._serialized != null ? msg.from._serialized : "";
+  const toRaw = typeof msg.to === "string" ? msg.to : msg.to?._serialized != null ? msg.to._serialized : "";
+  const toOut = meWid && toRaw === meWid ? "me" : toRaw || "me";
+
+  const authorFromMsg =
+    typeof msg.author === "string" && msg.author.length > 0 ? msg.author : null;
+  /** Group: @lid / @c.us on author; direct incoming: use from */
+  const authorId =
+    authorFromMsg ?? (!msg.fromMe ? fromStr || null : null);
+
+  let authorPushname: string | null = null;
+  let authorNumber: string | null = null;
+
+  // Resolve contact info as best-effort (also for fromMe messages).
+  // This gives pushname/number for both direct and group chats.
+  try {
+    const contact = await msg.getContact();
+    if (contact) {
+      authorPushname = contact.pushname ?? contact.name ?? null;
+      authorNumber = contact.number != null ? String(contact.number) : null;
+    }
+  } catch {
+    /* contact resolution is best-effort */
+  }
+
+  const ts = typeof msg.timestamp === "number" ? msg.timestamp : 0;
+  const base: Record<string, unknown> = {
+    messageId: idStr,
+    from: fromStr,
+    to: toOut,
+    author: authorId,
+    // Keep old keys (authorPushname/authorNumber) for compatibility,
+    // but also expose the exact keys the API consumer expects.
+    authorPushname,
+    authorNumber,
+    pushname: authorPushname,
+    number: authorNumber,
+    body: msg.body ?? "",
+    type: msg.type ?? "unknown",
+    timestamp: ts,
+    dateTime: formatMessageDateTime(ts),
+    fromMe: Boolean(msg.fromMe),
+    hasMedia: Boolean(msg.hasMedia),
+    ack: typeof msg.ack === "number" ? msg.ack : Number(msg.ack ?? 0),
+  };
+
+  if (msg.deviceType !== undefined) base.deviceType = msg.deviceType;
+  if (msg.isForwarded !== undefined) base.isForwarded = msg.isForwarded;
+  if (msg.forwardingScore !== undefined) base.forwardingScore = msg.forwardingScore;
+  if (msg.broadcast !== undefined) base.broadcast = msg.broadcast;
+  if (msg.isStatus !== undefined) base.isStatus = msg.isStatus;
+
+  const quotedId = msg._data?.quotedMsg?.id?._serialized;
+  if (msg.hasQuotedMsg && quotedId) {
+    base.quotedMessageId = quotedId;
+  }
+
+  if (msg.hasMedia) {
+    const raw = msg._data || {};
+    if (raw.mimetype) base.mimetype = raw.mimetype;
+    if (raw.filename) base.filename = raw.filename;
+    base.mediaType = msg.type;
+  }
+
+  return base;
+};
+
+export const fetchLatestChatMessagesByApiKey = async (params: {
+  userId: number;
+  phoneNumber?: string;
+  groupId?: string;
+  limit: number;
+}): Promise<{
+  chatId: string;
+  chatType: "direct" | "group";
+  requestedLimit: number;
+  loadedCount: number;
+  messages: Record<string, unknown>[];
+}> => {
+  const state = getWhatsAppStatus(params.userId);
+  if (state.status !== "READY") {
+    throw new ApiError(503, "WhatsApp client is not ready", { clientStatus: state.status });
+  }
+
+  let client: ReturnType<typeof getClient>;
+  try {
+    client = getClient(params.userId);
+  } catch {
+    throw new ApiError(503, "WhatsApp client is not ready", { clientStatus: "NOT_INITIALIZED" });
+  }
+  const resolvedChatId = params.groupId ?? toWhatsAppId(params.phoneNumber!);
+
+  let chat: any;
+  try {
+    chat = await client.getChatById(resolvedChatId);
+  } catch {
+    throw new ApiError(502, "Failed to load chat");
+  }
+  if (!chat) {
+    throw new ApiError(404, "Chat not found");
+  }
+
+  let rawMessages: any[];
+  try {
+    rawMessages = await chat.fetchMessages({ limit: params.limit });
+  } catch {
+    throw new ApiError(502, "Failed to fetch messages");
+  }
+
+  const ordered = [...rawMessages].reverse();
+  const meWid = state.clientInfo?.widSerialized ?? null;
+  const chatType: "direct" | "group" = chat.isGroup ? "group" : "direct";
+  const chatId = chat.id?._serialized ?? resolvedChatId;
+
+  const messages = await Promise.all(
+    ordered.map(async (m, idx) => {
+      const dto = await mapWhatsAppMessageToDtoAsync(m, meWid);
+      // `recordNo` is the first field for ordering in the JSON output.
+      return { recordNo: idx + 1, ...dto };
+    })
+  );
+
+  return {
+    chatId,
+    chatType,
+    requestedLimit: params.limit,
+    loadedCount: ordered.length,
+    messages,
+  };
 };
 
 export const sendWhatsAppText = async (

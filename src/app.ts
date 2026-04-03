@@ -100,7 +100,10 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
         // API-key based endpoint: does not rely on session auth.
         if (
           !req.path.startsWith("/api/whatsapp/send") &&
-          !req.path.startsWith("/api/whatsapp/send-api-key")
+          !req.path.startsWith("/api/whatsapp/send-api-key") &&
+          !req.path.startsWith("/api/whatsapp/status") &&
+          !req.path.startsWith("/api/whatsapp/status-api-key") &&
+          !req.path.startsWith("/api/whatsapp/messages")
         ) {
           const sessionData: any = (req as any).session;
           if (!sessionData?.user) {

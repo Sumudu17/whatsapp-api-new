@@ -21,44 +21,9 @@
         </div>
       </header>
 
-      <section class="grid">
-        <div class="card d-flex flex-column gap-3">
-          <!-- Row 1: Create key (top) + Your keys (bottom) -->
-          <div>
-            <h2>Create Key</h2>
-            <div class="w-100">
-              <label class="form-label mb-1" for="keyName">App / Key Name</label>
-              <div class="d-flex gap-2 align-items-center">
-                <input
-                  type="text"
-                  id="keyName"
-                  placeholder="e.g. my-external-app"
-                  class="form-control flex-grow-1"
-                />
-                <button id="createKeyBtn" class="btn btn-primary flex-shrink-0">
-                  Create API Key
-                </button>
-              </div>
-            </div>
-            <p id="createKeyError" class="error hidden mb-0"></p>
-            <div id="rawKeyBox" class="info hidden" style="margin-top:12px;">
-              <div><strong>Copy this key:</strong></div>
-              <pre id="rawKeyText" style="white-space:pre-wrap; word-break:break-all; margin: 8px 0 0;"></pre>
-              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-                <button id="copyRawKeyBtn" class="btn btn-secondary btn-sm" type="button">Copy API Key</button>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2>Your Keys</h2>
-            <div id="keysList" style="display:flex; flex-direction:column; gap:10px;"></div>
-          </div>
-        </div>
-
-        <div class="d-flex flex-column gap-3">
-          <!-- Row 2: API details (includes userId) -->
-          <div class="card">
+      <section class="api-page-sections d-flex flex-column gap-3 w-100">
+        <!-- Row 1: API details (full width, same as header) -->
+        <div class="card w-100">
             <h2>API Details</h2>
             <p class="mb-2">
               <strong>Your userId:</strong> <span id="userIdValue">-</span>
@@ -117,18 +82,76 @@
                 <h4 style="margin:0 0 6px;">Status Response (Invalid API Key)</h4>
                 <pre id="statusInvalidKeyResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
               </div>
+
+              <hr />
+              <p style="margin-top:10px;">
+                Messages API endpoint:
+                <code id="endpointMessagesUrlPost"></code>
+              </p>
+              <p>
+                Use either <code>phoneNumber</code> or <code>groupId</code> (xor). Optional <code>limit</code> (default 20, max 100).
+              </p>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Messages Request (Direct Chat)</h4>
+                <pre id="exampleMessagesPhonePayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Messages Request (Group Chat)</h4>
+                <pre id="exampleMessagesGroupPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Messages Success Response (example)</h4>
+                <pre id="messagesSuccessResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Messages Error Response (Invalid API Key)</h4>
+                <pre id="messagesInvalidKeyResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
             </div>
           </div>
 
-          <!-- Row 3: Available groups fetch (separate group) -->
-          <div class="card">
+        <!-- Row 2: Create key + Your keys (full width) -->
+        <div class="card w-100 d-flex flex-column gap-3">
+          <div>
+            <h2>Create Key</h2>
+            <div class="w-100">
+              <label class="form-label mb-1" for="keyName">App / Key Name</label>
+              <div class="d-flex gap-2 align-items-center">
+                <input
+                  type="text"
+                  id="keyName"
+                  placeholder="e.g. my-external-app"
+                  class="form-control flex-grow-1"
+                />
+                <button id="createKeyBtn" class="btn btn-primary flex-shrink-0">
+                  Create API Key
+                </button>
+              </div>
+            </div>
+            <p id="createKeyError" class="error hidden mb-0"></p>
+            <div id="rawKeyBox" class="info hidden" style="margin-top:12px;">
+              <div><strong>Copy this key:</strong></div>
+              <pre id="rawKeyText" style="white-space:pre-wrap; word-break:break-all; margin: 8px 0 0;"></pre>
+              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button id="copyRawKeyBtn" class="btn btn-secondary btn-sm" type="button">Copy API Key</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2>Your Keys</h2>
+            <div id="keysList" style="display:flex; flex-direction:column; gap:10px;"></div>
+          </div>
+        </div>
+
+        <!-- Row 3: Available groups -->
+        <div class="card w-100">
             <h2>Available Groups (groupId + name)</h2>
             <p id="groupsStatusText" class="info" style="margin:0 0 6px;">
               Click refresh to fetch groups.
             </p>
             <button id="refreshGroupsBtnApi" class="btn btn-secondary btn-sm" type="button">Refresh Groups</button>
             <div id="groupsListApi" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;"></div>
-          </div>
         </div>
       </section>
         </div>
@@ -181,6 +204,11 @@
       const groupsStatusText = document.getElementById("groupsStatusText");
       const endpointUrlGet = document.getElementById("endpointUrlGet");
       const endpointUrlPost = document.getElementById("endpointUrlPost");
+      const endpointMessagesUrlPost = document.getElementById("endpointMessagesUrlPost");
+      const exampleMessagesPhonePayloadText = document.getElementById("exampleMessagesPhonePayloadText");
+      const exampleMessagesGroupPayloadText = document.getElementById("exampleMessagesGroupPayloadText");
+      const messagesSuccessResponseText = document.getElementById("messagesSuccessResponseText");
+      const messagesInvalidKeyResponseText = document.getElementById("messagesInvalidKeyResponseText");
       const endpointStatusUrlPost = document.getElementById("endpointStatusUrlPost");
       const exampleStatusPayloadText = document.getElementById("exampleStatusPayloadText");
       const statusReadyResponseText = document.getElementById("statusReadyResponseText");
@@ -194,6 +222,9 @@
       const origin = window.location.origin;
       if (endpointUrlGet) endpointUrlGet.textContent = `${origin}/api/whatsapp/send`;
       if (endpointUrlPost) endpointUrlPost.textContent = `POST ${origin}/api/whatsapp/send`;
+      if (endpointMessagesUrlPost) {
+        endpointMessagesUrlPost.textContent = `POST ${origin}/api/whatsapp/messages`;
+      }
       if (endpointStatusUrlPost) {
         endpointStatusUrlPost.textContent = `POST ${origin}/api/whatsapp/status`;
       }
@@ -314,12 +345,61 @@
           clientStatus: "INVALID_API_KEY",
           message: "API key is not valid",
         };
+        const messagesPhoneExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          phoneNumber: "+94717177326",
+          limit: 20,
+        };
+        const messagesGroupExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          groupId: "1234567890-123456789@g.us",
+          limit: 20,
+        };
+        const messagesSuccessExample = {
+          success: true,
+          statusCode: 200,
+          message: "Messages loaded successfully",
+          chatType: "group",
+          chatId: "1234567890-123456789@g.us",
+          requestedLimit: 20,
+          loadedCount: 1,
+          messages: [
+            {
+              recordNo: 1,
+              messageId: "false_1234567890-123456789@g.us_EXAMPLEMSGHASH_111111111111111@lid",
+              from: "1234567890-123456789@g.us",
+              to: "me",
+              author: "111111111111111@lid",
+              authorPushname: "Example display name",
+              authorNumber: "94700000000",
+              pushname: "Example display name",
+              number: "94700000000",
+              body: "Hello from API (example)",
+              type: "chat",
+              timestamp: 1712345678,
+              dateTime: "2026-04-03 10:30:00",
+              fromMe: false,
+              hasMedia: false,
+              ack: 1,
+              deviceType: "android",
+              isForwarded: false,
+              forwardingScore: 0,
+              isStatus: false,
+            },
+          ],
+        };
         examplePhonePayloadText.textContent = JSON.stringify(phoneExample, null, 2);
         exampleGroupPayloadText.textContent = JSON.stringify(groupExample, null, 2);
         exampleStatusPayloadText.textContent = JSON.stringify(statusExample, null, 2);
         statusReadyResponseText.textContent = JSON.stringify(statusReadyExample, null, 2);
         statusNotReadyResponseText.textContent = JSON.stringify(statusNotReadyExample, null, 2);
         statusInvalidKeyResponseText.textContent = JSON.stringify(statusInvalidApiKeyExample, null, 2);
+        exampleMessagesPhonePayloadText.textContent = JSON.stringify(messagesPhoneExample, null, 2);
+        exampleMessagesGroupPayloadText.textContent = JSON.stringify(messagesGroupExample, null, 2);
+        messagesSuccessResponseText.textContent = JSON.stringify(messagesSuccessExample, null, 2);
+        messagesInvalidKeyResponseText.textContent = JSON.stringify(statusInvalidApiKeyExample, null, 2);
         apiDetailsBox.classList.remove("hidden");
       };
 
