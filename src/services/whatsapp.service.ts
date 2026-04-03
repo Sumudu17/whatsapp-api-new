@@ -85,7 +85,10 @@ const formatMessageDateTime = (unixSeconds: number): string => {
  */
 export const mapWhatsAppMessageToDtoAsync = async (
   msg: any,
-  meWid: string | null
+  meWid: string | null,
+  chatId: string,
+  myPushname: string | null,
+  myPhoneNumber: string | null
 ): Promise<Record<string, unknown>> => {
   const idStr = msg.id?._serialized ?? "";
   const fromStr =
@@ -95,37 +98,38 @@ export const mapWhatsAppMessageToDtoAsync = async (
 
   const authorFromMsg =
     typeof msg.author === "string" && msg.author.length > 0 ? msg.author : null;
-  /** Group: @lid / @c.us on author; direct incoming: use from */
-  const authorId =
-    authorFromMsg ?? (!msg.fromMe ? fromStr || null : null);
 
-  let authorPushname: string | null = null;
-  let authorNumber: string | null = null;
+  // For group chats, `author` is the sender. For direct chats, `from` is the sender.
+  // For outgoing messages (`fromMe=true`), sender is your own WA identity (meWid).
+  const senderId =
+    authorFromMsg ?? (msg.fromMe ? meWid : fromStr || null);
 
-  // Resolve contact info as best-effort (also for fromMe messages).
-  // This gives pushname/number for both direct and group chats.
-  try {
-    const contact = await msg.getContact();
-    if (contact) {
-      authorPushname = contact.pushname ?? contact.name ?? null;
-      authorNumber = contact.number != null ? String(contact.number) : null;
+  let senderPushname: string | null = null;
+  let senderNumber: string | null = null;
+
+  // Resolve contact info as best-effort.
+  // For outgoing messages, we already know pushname/number from clientInfo.
+  if (!msg.fromMe) {
+    try {
+      const contact = await msg.getContact();
+      if (contact) {
+        senderPushname = contact.pushname ?? contact.name ?? null;
+        senderNumber = contact.number != null ? String(contact.number) : null;
+      }
+    } catch {
+      /* contact resolution is best-effort */
     }
-  } catch {
-    /* contact resolution is best-effort */
+  } else {
+    senderPushname = myPushname;
+    senderNumber = myPhoneNumber;
   }
 
   const ts = typeof msg.timestamp === "number" ? msg.timestamp : 0;
+
   const base: Record<string, unknown> = {
+    recordNo: undefined,
     messageId: idStr,
-    from: fromStr,
-    to: toOut,
-    author: authorId,
-    // Keep old keys (authorPushname/authorNumber) for compatibility,
-    // but also expose the exact keys the API consumer expects.
-    authorPushname,
-    authorNumber,
-    pushname: authorPushname,
-    number: authorNumber,
+    chatId,
     body: msg.body ?? "",
     type: msg.type ?? "unknown",
     timestamp: ts,
@@ -133,18 +137,16 @@ export const mapWhatsAppMessageToDtoAsync = async (
     fromMe: Boolean(msg.fromMe),
     hasMedia: Boolean(msg.hasMedia),
     ack: typeof msg.ack === "number" ? msg.ack : Number(msg.ack ?? 0),
+    deviceType: msg.deviceType ?? "unknown",
+    isForwarded: Boolean(msg.isForwarded),
+    forwardingScore: typeof msg.forwardingScore === "number" ? msg.forwardingScore : 0,
+    isStatus: Boolean(msg.isStatus),
+    sender: {
+      id: senderId,
+      pushname: senderPushname,
+      number: senderNumber,
+    },
   };
-
-  if (msg.deviceType !== undefined) base.deviceType = msg.deviceType;
-  if (msg.isForwarded !== undefined) base.isForwarded = msg.isForwarded;
-  if (msg.forwardingScore !== undefined) base.forwardingScore = msg.forwardingScore;
-  if (msg.broadcast !== undefined) base.broadcast = msg.broadcast;
-  if (msg.isStatus !== undefined) base.isStatus = msg.isStatus;
-
-  const quotedId = msg._data?.quotedMsg?.id?._serialized;
-  if (msg.hasQuotedMsg && quotedId) {
-    base.quotedMessageId = quotedId;
-  }
 
   if (msg.hasMedia) {
     const raw = msg._data || {};
@@ -153,6 +155,8 @@ export const mapWhatsAppMessageToDtoAsync = async (
     base.mediaType = msg.type;
   }
 
+  // Remove placeholder key (we set recordNo at the outer layer).
+  delete base.recordNo;
   return base;
 };
 
@@ -200,12 +204,14 @@ export const fetchLatestChatMessagesByApiKey = async (params: {
 
   const ordered = [...rawMessages].reverse();
   const meWid = state.clientInfo?.widSerialized ?? null;
+  const myPushname = state.clientInfo?.pushname ?? null;
+  const myPhoneNumber = state.clientInfo?.phoneNumber ?? null;
   const chatType: "direct" | "group" = chat.isGroup ? "group" : "direct";
   const chatId = chat.id?._serialized ?? resolvedChatId;
 
   const messages = await Promise.all(
     ordered.map(async (m, idx) => {
-      const dto = await mapWhatsAppMessageToDtoAsync(m, meWid);
+      const dto = await mapWhatsAppMessageToDtoAsync(m, meWid, chatId, myPushname, myPhoneNumber);
       // `recordNo` is the first field for ordering in the JSON output.
       return { recordNo: idx + 1, ...dto };
     })

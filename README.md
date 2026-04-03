@@ -90,6 +90,7 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - `POST /api/auth/logout`
 - `GET /api/auth/me` (session; includes `user.isAdmin` when email matches `ADMIN_EMAIL` / `ADMIN_EMAILS`)
 - `GET /api/admin/accounts` (session; **admin only** — lists users and DB + live WhatsApp status)
+- `DELETE /api/admin/users/:id` (session; **admin only** — deletes user and cleans WhatsApp session files on disk)
 - `POST /api/auth/change-name` (session)
 - `POST /api/auth/change-email/request-otp` (session)
 - `POST /api/auth/change-email/verify-otp` (session)
@@ -101,11 +102,14 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 
 - `POST /api/whatsapp/initialize` (session; triggers QR via WebSocket)
 - `POST /api/whatsapp/logout` (session)
-- `GET /api/whatsapp/status` (session; current in-memory state)
 - `GET /api/whatsapp/connection` (session; state + last disconnect metadata from MySQL)
+- `GET /api/whatsapp/dashboard-status` (session; dashboard UI — connection-style payload)
 - `GET /api/whatsapp/groups` (session; only when state is `READY`)
-
+- `POST /api/whatsapp/status` (**API key** — `userId` + `apiKey`; external client status)
+- `POST /api/whatsapp/messages` (**API key** — `userId` + `apiKey` + XOR `phoneNumber` / `groupId` + optional `limit`; fetch latest messages)
 - `POST /api/whatsapp/send` (session auth or API-key auth; routes through the correct WhatsApp session)
+- `POST /api/whatsapp/send-api-key` (deprecated alias for API-key send)
+- `POST /api/whatsapp/status-api-key` (deprecated alias for API-key status)
 
 ### WhatsApp Send Payload (session auth)
 `POST /api/whatsapp/send`
@@ -155,7 +159,7 @@ Rules: provide exactly one of `phoneNumber` or `groupId`.
 }
 ```
 
-Response (success):
+Response (success, session auth):
 
 ```
 {
@@ -163,6 +167,124 @@ Response (success):
   "messageId": "..."
 }
 ```
+
+Response (success, API key auth — may also include `raw` and `clientStatus`):
+
+```
+{
+  "success": true,
+  "messageId": "...",
+  "clientStatus": "READY"
+}
+```
+
+### WhatsApp Status (API key auth)
+
+`POST /api/whatsapp/status`
+
+Request body:
+
+```
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE"
+}
+```
+
+Response (success):
+
+```
+{
+  "success": true,
+  "statusCode": 200,
+  "clientStatus": "READY",
+  "message": "Client is ready"
+}
+```
+
+`clientStatus` may be: `READY`, `NOT_INITIALIZED`, `INITIALIZING`, `QR_REQUIRED`, `AUTHENTICATED`, `DISCONNECTED`. Invalid key:
+
+```
+{
+  "success": false,
+  "statusCode": 401,
+  "clientStatus": "INVALID_API_KEY",
+  "message": "API key is not valid"
+}
+```
+
+### WhatsApp Messages (API key auth)
+
+`POST /api/whatsapp/messages`
+
+Rules: provide exactly one of `phoneNumber` or `groupId` (same XOR pattern as send). Optional `limit` (default **20**, max **100**).
+
+#### Direct chat request body
+
+```
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "phoneNumber": "+94717177326",
+  "limit": 20
+}
+```
+
+#### Group chat request body
+
+```
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "groupId": "1234567890-123456789@g.us",
+  "limit": 20
+}
+```
+
+Response (success):
+
+```
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Messages loaded successfully",
+  "chatType": "direct",
+  "chatId": "94717177326@c.us",
+  "requestedLimit": 20,
+  "loadedCount": 1,
+  "messages": [ /* see message object below */ ]
+}
+```
+
+Each item in `messages` uses this shape (no `from` / `to` / `author` flat duplicates):
+
+```
+{
+  "recordNo": 1,
+  "messageId": "false_94717177326@c.us_EXAMPLEHASH_123@lid",
+  "chatId": "94717177326@c.us",
+  "body": "Hello",
+  "type": "chat",
+  "timestamp": 1775201024,
+  "dateTime": "2026-04-03 12:53:44",
+  "fromMe": false,
+  "hasMedia": false,
+  "ack": 1,
+  "deviceType": "ios",
+  "isForwarded": false,
+  "forwardingScore": 0,
+  "isStatus": false,
+  "sender": {
+    "id": "1234567890123@lid",
+    "pushname": "Example",
+    "number": "94717177326"
+  }
+}
+```
+
+When `hasMedia` is true, optional fields may appear: `mimetype`, `mediaType`, `filename` (metadata only; media files are not downloaded by this API).
+
+If the WhatsApp client is not `READY`, the API returns HTTP **503** with `success: false`, `statusCode`, `clientStatus`, and `message` (same style as status checks).
 
 ### Send WhatsApp Message (API examples)
 

@@ -369,13 +369,7 @@
             {
               recordNo: 1,
               messageId: "false_1234567890-123456789@g.us_EXAMPLEMSGHASH_111111111111111@lid",
-              from: "1234567890-123456789@g.us",
-              to: "me",
-              author: "111111111111111@lid",
-              authorPushname: "Example display name",
-              authorNumber: "94700000000",
-              pushname: "Example display name",
-              number: "94700000000",
+              chatId: "1234567890-123456789@g.us",
               body: "Hello from API (example)",
               type: "chat",
               timestamp: 1712345678,
@@ -387,6 +381,11 @@
               isForwarded: false,
               forwardingScore: 0,
               isStatus: false,
+              sender: {
+                id: "111111111111111@lid",
+                pushname: "Example display name",
+                number: "94700000000",
+              },
             },
           ],
         };
