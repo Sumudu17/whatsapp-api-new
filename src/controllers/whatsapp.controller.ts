@@ -6,6 +6,7 @@ import {
   initializeWhatsApp,
   logoutWhatsApp,
   sendWhatsAppText,
+  sendWhatsAppMessageByApiKey,
   fetchLatestChatMessagesByApiKey,
 } from "../services/whatsapp.service";
 import { toWhatsAppId } from "../utils/format";
@@ -110,12 +111,15 @@ export const send = async (req: Request, res: Response, next: NextFunction) => {
 
 export const sendByApiKey = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId, apiKey, phoneNumber, groupId, message } = req.body as {
+    const { userId, apiKey, phoneNumber, groupId, message, mediaUrl, caption, sendMediaAsDocument } = req.body as {
       userId: number;
       apiKey: string;
       phoneNumber?: string;
       groupId?: string;
-      message: string;
+      message?: string;
+      mediaUrl?: string;
+      caption?: string;
+      sendMediaAsDocument?: boolean;
     };
 
     // Validate API key for this user (status ACTIVE only).
@@ -132,20 +136,85 @@ export const sendByApiKey = async (req: Request, res: Response, next: NextFuncti
       throw new ApiError(503, "WhatsApp client is not ready", { state });
     }
 
-    const result = await sendWhatsAppText(
+    const result = await sendWhatsAppMessageByApiKey({
       userId,
-      phoneNumber ? toWhatsAppId(phoneNumber) : undefined,
+      phoneNumber,
       groupId,
-      message
-    );
+      message,
+      mediaUrl,
+      caption,
+      sendMediaAsDocument,
+    });
 
-    res.json({
+    return res.status(200).json({
       success: true,
+      statusCode: 200,
+      message:
+        result.messageType === "media"
+          ? "Media message sent successfully"
+          : "Message sent successfully",
+      data: {
+        chatType: result.chatType,
+        chatId: result.chatId,
+        messageType: result.messageType,
+        ...(result.messageType === "text"
+          ? { message: result.message }
+          : {
+              mediaUrl: result.mediaUrl,
+              caption: result.caption,
+              sendMediaAsDocument: result.sendMediaAsDocument,
+            }),
+        messageId: result.messageId,
+      },
+      // Backward-compatible fields used by existing clients.
       messageId: result.messageId,
       raw: result.raw,
       clientStatus: state.status,
     });
   } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.message === "Invalid API key") {
+        return res.status(401).json({
+          success: false,
+          statusCode: 401,
+          clientStatus: "INVALID_API_KEY",
+          message: "API key is not valid",
+        });
+      }
+      if (err.statusCode === 503 && err.message === "WhatsApp client is not ready") {
+        const status = getWhatsAppStatus((req.body as { userId: number }).userId);
+        return res.status(503).json({
+          success: false,
+          statusCode: 503,
+          clientStatus: status.status,
+          message: "WhatsApp client is not ready",
+        });
+      }
+      if (err.message === "Failed to load media from mediaUrl") {
+        return res.status(400).json({
+          success: false,
+          statusCode: 400,
+          message: "Failed to download media from URL",
+          details: err.details,
+        });
+      }
+      if (err.message === "Invalid mediaUrl") {
+        return res.status(400).json({
+          success: false,
+          statusCode: 400,
+          message: "Invalid mediaUrl",
+        });
+      }
+      if (err.statusCode === 502 && err.message === "Failed to send message") {
+        return res.status(502).json({
+          success: false,
+          statusCode: 502,
+          clientStatus: "READY",
+          message: "Failed to send WhatsApp message",
+          details: err.details,
+        });
+      }
+    }
     next(err);
   }
 };

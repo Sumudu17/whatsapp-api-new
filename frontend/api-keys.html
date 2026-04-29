@@ -44,6 +44,17 @@
                 <h4 style="margin:0 0 6px;">Group Message Example</h4>
                 <pre id="exampleGroupPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
               </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Direct Media (image) Example</h4>
+                <pre id="examplePhoneMediaPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Group Media (image) Example</h4>
+                <pre id="exampleGroupMediaPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <p style="margin-top:10px;">
+                For PDFs/ZIP/doc files set <code>sendMediaAsDocument: true</code>.
+              </p>
               <p style="margin-top:10px;">
                 API endpoint:
                 <code id="endpointUrlPost"></code>
@@ -214,6 +225,8 @@
       const statusReadyResponseText = document.getElementById("statusReadyResponseText");
       const statusNotReadyResponseText = document.getElementById("statusNotReadyResponseText");
       const statusInvalidKeyResponseText = document.getElementById("statusInvalidKeyResponseText");
+      const examplePhoneMediaPayloadText = document.getElementById("examplePhoneMediaPayloadText");
+      const exampleGroupMediaPayloadText = document.getElementById("exampleGroupMediaPayloadText");
 
       let currentUserId = null;
       let lastCreatedRawKey = null;
@@ -323,6 +336,22 @@
           groupId: "1234567890-123456789@g.us",
           message: "Hello from API (group message)",
         };
+        const phoneMediaExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          phoneNumber: "+94717177326",
+          mediaUrl: "https://example.com/image.jpg",
+          caption: "This is my image caption",
+          sendMediaAsDocument: false,
+        };
+        const groupMediaExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          groupId: "1234567890-123456789@g.us",
+          mediaUrl: "https://example.com/image.jpg",
+          caption: "This is group image caption",
+          sendMediaAsDocument: false,
+        };
         const statusExample = {
           userId: currentUserId,
           apiKey: keyValue,
@@ -391,6 +420,12 @@
         };
         examplePhonePayloadText.textContent = JSON.stringify(phoneExample, null, 2);
         exampleGroupPayloadText.textContent = JSON.stringify(groupExample, null, 2);
+        if (examplePhoneMediaPayloadText) {
+          examplePhoneMediaPayloadText.textContent = JSON.stringify(phoneMediaExample, null, 2);
+        }
+        if (exampleGroupMediaPayloadText) {
+          exampleGroupMediaPayloadText.textContent = JSON.stringify(groupMediaExample, null, 2);
+        }
         exampleStatusPayloadText.textContent = JSON.stringify(statusExample, null, 2);
         statusReadyResponseText.textContent = JSON.stringify(statusReadyExample, null, 2);
         statusNotReadyResponseText.textContent = JSON.stringify(statusNotReadyExample, null, 2);
