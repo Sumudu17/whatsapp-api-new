@@ -4,6 +4,8 @@ import { getState } from "../whatsapp/state";
 import { toWhatsAppId } from "../utils/format";
 import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { MessageMedia } = require("../../index.js");
 
 export const initializeWhatsApp = async (
   userId: number,
@@ -252,5 +254,95 @@ export const sendWhatsAppText = async (
   return {
     messageId: result?.id?._serialized ?? result?.id ?? null,
     raw: result,
+  };
+};
+
+export const sendWhatsAppMessageByApiKey = async (params: {
+  userId: number;
+  phoneNumber?: string;
+  groupId?: string;
+  message?: string;
+  mediaUrl?: string;
+  caption?: string;
+  sendMediaAsDocument?: boolean;
+}) => {
+  const state = getState(params.userId);
+  if (state.status !== "READY") {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  let client: ReturnType<typeof getClient>;
+  try {
+    client = getClient(params.userId);
+  } catch {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  if ((params.phoneNumber && params.groupId) || (!params.phoneNumber && !params.groupId)) {
+    throw new ApiError(400, "Either phoneNumber or groupId is required (not both)");
+  }
+
+  const chatId = params.groupId ?? toWhatsAppId(params.phoneNumber!);
+  const chatType: "direct" | "group" = params.groupId ? "group" : "direct";
+
+  if (!params.mediaUrl) {
+    if (!params.message?.trim()) {
+      throw new ApiError(400, "message is required when mediaUrl is not provided");
+    }
+    let sentMessage: any;
+    try {
+      sentMessage = await client.sendMessage(chatId, params.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send message";
+      throw new ApiError(502, "Failed to send message", { message });
+    }
+    return {
+      chatType,
+      chatId,
+      messageType: "text" as const,
+      message: params.message,
+      sendMediaAsDocument: false,
+      caption: "",
+      mediaUrl: null,
+      messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+      raw: sentMessage,
+    };
+  }
+
+  let media: any;
+  try {
+    media = await MessageMedia.fromUrl(params.mediaUrl);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unable to download media";
+    throw new ApiError(400, "Failed to load media from mediaUrl", { mediaUrl: params.mediaUrl, message });
+  }
+
+  if (!media) {
+    throw new ApiError(400, "Invalid mediaUrl");
+  }
+
+  const sendMediaAsDocument = Boolean(params.sendMediaAsDocument);
+  const finalCaption = params.caption ?? params.message ?? "";
+  let sentMessage: any;
+  try {
+    sentMessage = await client.sendMessage(chatId, media, {
+      caption: finalCaption,
+      sendMediaAsDocument,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send message";
+    throw new ApiError(502, "Failed to send message", { message });
+  }
+
+  return {
+    chatType,
+    chatId,
+    messageType: "media" as const,
+    message: params.message ?? "",
+    caption: finalCaption,
+    mediaUrl: params.mediaUrl,
+    sendMediaAsDocument,
+    messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+    raw: sentMessage,
   };
 };

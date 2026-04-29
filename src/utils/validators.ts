@@ -38,11 +38,41 @@ export const sendByApiKeySchema = z
       .trim()
       .regex(/@g\.us$/, "groupId must end with @g.us")
       .optional(),
-    message: z.string().trim().min(1).max(1000),
+    message: z.string().trim().min(1).max(1000).optional(),
+    mediaUrl: z
+      .string()
+      .trim()
+      .url("mediaUrl must be a valid URL")
+      .refine((url) => /^https?:\/\//i.test(url), {
+        message: "mediaUrl must start with http:// or https://",
+      })
+      .optional(),
+    caption: z.string().trim().max(1000).optional(),
+    sendMediaAsDocument: z
+      .preprocess((value) => {
+        if (value === undefined || value === null || value === "") return false;
+        if (typeof value === "boolean") return value;
+        if (typeof value === "string") {
+          const normalized = value.trim().toLowerCase();
+          if (normalized === "true" || normalized === "1") return true;
+          if (normalized === "false" || normalized === "0") return false;
+        }
+        if (typeof value === "number") return value === 1;
+        return value;
+      }, z.boolean())
+      .optional()
+      .default(false),
   })
   .refine((data) => !!data.phoneNumber !== !!data.groupId, {
     message: "Either phoneNumber or groupId is required (not both)",
     path: ["phoneNumber"],
+  })
+  .refine((data) => {
+    if (data.mediaUrl) return true;
+    return !!data.message;
+  }, {
+    message: "message is required when mediaUrl is not provided",
+    path: ["message"],
   });
 
 export const statusByApiKeySchema = z.object({
