@@ -5,7 +5,7 @@ This document describes these endpoints:
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/api/whatsapp/status` | Check if the WhatsApp client is ready (API key) |
-| `POST` | `/api/whatsapp/send` | Send a text message (**API key** — `userId` + `apiKey` + XOR `phoneNumber` / `groupId`) |
+| `POST` | `/api/whatsapp/send` | Send a text or media message (**API key** — `userId` + `apiKey` + XOR `phoneNumber` / `groupId`) |
 | `POST` | `/api/whatsapp/messages` | Fetch latest messages from a direct or group chat (API key) |
 
 - **Base URL:** e.g. `https://your-domain.example` or `http://localhost:4000`
@@ -71,9 +71,15 @@ curl -X POST "https://your-domain.example/api/whatsapp/status" \
 
 ## `POST /api/whatsapp/send`
 
-Sends a WhatsApp text message using **API key** authentication.
+Sends a WhatsApp text or media message using **API key** authentication.
 
-**Rules:** exactly one of `phoneNumber` (E.164) or `groupId` (ends with `@g.us`). Body must include `userId`, `apiKey`, `message`, and either `phoneNumber` or `groupId`.
+**Rules:**
+
+- Exactly one of `phoneNumber` (E.164) or `groupId` (ends with `@g.us`).
+- Always required: `userId`, `apiKey`.
+- Text-only: `message` is required when `mediaUrl` is not provided.
+- Media: `mediaUrl` must be `http/https`; optional `caption`; optional `sendMediaAsDocument` (default `false`).
+- Caption resolution for media: `finalCaption = caption || message || ""`.
 
 **Request — direct**
 
@@ -97,19 +103,119 @@ Sends a WhatsApp text message using **API key** authentication.
 }
 ```
 
-**Success response**
+**Request — direct media (image)**
+
+```json
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "phoneNumber": "+94717177326",
+  "mediaUrl": "https://example.com/image.jpg",
+  "caption": "This is my image caption",
+  "sendMediaAsDocument": false
+}
+```
+
+**Request — group media (image)**
+
+```json
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "groupId": "1234567890-123456789@g.us",
+  "mediaUrl": "https://example.com/image.jpg",
+  "caption": "This is group image caption",
+  "sendMediaAsDocument": false
+}
+```
+
+**Request — direct document (PDF)**
+
+```json
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "phoneNumber": "+94717177326",
+  "mediaUrl": "https://example.com/report.pdf",
+  "caption": "Please check this document",
+  "sendMediaAsDocument": true
+}
+```
+
+**Request — group file (ZIP)**
+
+```json
+{
+  "userId": 1,
+  "apiKey": "RAW_API_KEY_VALUE",
+  "groupId": "1234567890-123456789@g.us",
+  "mediaUrl": "https://example.com/files.zip",
+  "caption": "Please check this ZIP file",
+  "sendMediaAsDocument": true
+}
+```
+
+**Success response — text**
 
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Message sent successfully",
+  "data": {
+    "chatType": "group",
+    "chatId": "1234567890-123456789@g.us",
+    "messageType": "text",
+    "message": "Hello from API (group message)",
+    "messageId": "true_..._..."
+  },
   "messageId": "true_..._...",
+  "raw": {
+    "...": "whatsapp-web.js message object"
+  },
   "clientStatus": "READY"
 }
 ```
 
-`raw` may be present with the library’s message object on success.
+**Success response — media**
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Media message sent successfully",
+  "data": {
+    "chatType": "direct",
+    "chatId": "94717177326@c.us",
+    "messageType": "media",
+    "mediaUrl": "https://example.com/image.jpg",
+    "caption": "This is my image caption",
+    "sendMediaAsDocument": false,
+    "messageId": "true_..._..."
+  },
+  "messageId": "true_..._...",
+  "raw": {
+    "...": "whatsapp-web.js message object"
+  },
+  "clientStatus": "READY"
+}
+```
 
 If the client is not ready, the server may respond with an error (e.g. HTTP 503) and details from the global error handler.
+
+**Error response — media download failed (HTTP 400)**
+
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "Failed to download media from URL",
+  "details": {
+    "mediaUrl": "https://example.com/image.jpg",
+    "message": "Unable to download media"
+  }
+}
+```
 
 ### cURL
 
@@ -125,6 +231,22 @@ curl -X POST "https://your-domain.example/api/whatsapp/send" \
 curl -X POST "https://your-domain.example/api/whatsapp/send" \
   -H "Content-Type: application/json" \
   -d '{"userId":1,"apiKey":"RAW_API_KEY_VALUE","groupId":"1234567890-123456789@g.us","message":"Hello group"}'
+```
+
+**Media (image) example:**
+
+```bash
+curl -X POST "https://your-domain.example/api/whatsapp/send" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":1,"apiKey":"RAW_API_KEY_VALUE","phoneNumber":"+94717177326","mediaUrl":"https://example.com/image.jpg","caption":"Hello image","sendMediaAsDocument":false}'
+```
+
+**Document (PDF) example:**
+
+```bash
+curl -X POST "https://your-domain.example/api/whatsapp/send" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":1,"apiKey":"RAW_API_KEY_VALUE","groupId":"1234567890-123456789@g.us","mediaUrl":"https://example.com/report.pdf","caption":"Please review","sendMediaAsDocument":true}'
 ```
 
 ### Deprecated alias

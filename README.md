@@ -47,7 +47,7 @@ sudo apt-get install -y ca-certificates fonts-liberation libappindicator3-1 liba
    - `API_AUTH_REQUIRED` (optional, defaults to `false`)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
    - `SMTP_FROM` (optional, defaults to `SMTP_USER`)
-   - `ALERT_EMAIL_TO` (required for alerts)
+   - `ALERT_EMAIL_TO` (required for alerts; comma-separated for multiple recipients)
    - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (legacy `MYSQL_*` still supported if `DB_*` is unset)
    - `ADMIN_EMAIL` and optional comma-separated `ADMIN_EMAILS` (disconnect alerts + access to `/admin` and `GET /api/admin/accounts`)
 
@@ -247,7 +247,7 @@ Response: `{ "success": true }`
 - `state_change`
 
 ### Email Alerts
-- **Disconnect / auth failure:** emails go to the **account owner** and to every address from `ADMIN_EMAIL`, `ADMIN_EMAILS`, and `ALERT_EMAIL_TO` (deduplicated). Admin emails include **account name**, **user id**, **email**, and **client ID** (from `whatsapp_sessions`).
+- **Disconnect / auth failure:** emails go to the **account owner** and to every address from `ADMIN_EMAIL`, `ADMIN_EMAILS`, and comma-separated `ALERT_EMAIL_TO` (deduplicated). Admin emails include **account name**, **user id**, **email**, and **client ID** (from `whatsapp_sessions`).
 - **Not ready:** if status stays not `READY` for **more than 5 minutes**, the same recipients get a **not connected** alert (admin body includes **name**, **user id**, **email**, **client ID**, and current status).
 - Check delivery status with: `GET /api/alerts/status`
 - Trigger a test email with: `POST /api/alerts/test`
