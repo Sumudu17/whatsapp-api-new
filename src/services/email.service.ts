@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { getAlertEmailRecipients } from "../utils/admin";
 import { logger } from "../utils/logger";
 
 type EmailStatus = {
@@ -58,26 +59,21 @@ export const sendEmail = async (to: string, subject: string, text: string) => {
 };
 
 export const sendAlertEmail = async (subject: string, text: string) => {
-  const host = getRequiredEnv("SMTP_HOST");
-  const port = Number(getRequiredEnv("SMTP_PORT"));
-  const user = getRequiredEnv("SMTP_USER");
-  const pass = getRequiredEnv("SMTP_PASS");
-  const to = getRequiredEnv("ALERT_EMAIL_TO");
-  const from = process.env.SMTP_FROM || user;
-
-  const transporter = createTransporter();
+  const recipients = getAlertEmailRecipients();
+  if (recipients.length === 0) {
+    throw new Error("ALERT_EMAIL_TO is missing");
+  }
 
   try {
-    const info = await transporter.sendMail({
-      from,
-      to,
-      subject,
-      text,
-    });
+    let lastInfo;
+    for (const to of recipients) {
+      // eslint-disable-next-line no-await-in-loop
+      lastInfo = await sendEmail(to, subject, text);
+    }
     status.lastSentAt = new Date().toISOString();
     status.lastError = null;
-    logger.info({ messageId: info.messageId }, "Alert email sent");
-    return info;
+    logger.info({ recipients, messageId: lastInfo?.messageId }, "Alert email sent");
+    return lastInfo!;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown email error";
     status.lastError = message;
