@@ -361,11 +361,14 @@ exports.LoadUtils = () => {
         }
 
         const [msgPromise, sendMsgResultPromise] = window.Store.SendMessage.addAndSendMsgToChat(chat, message);
-        await msgPromise;
+        const addedMsg = await msgPromise;
 
         if (options.waitUntilMsgSent) await sendMsgResultPromise;
 
-        return window.Store.Msg.get(newMsgKey._serialized);
+        // On newer WhatsApp Web builds (LID addressing), the stored message key can
+        // differ from the pre-computed one, making the lookup fail. Fall back to the
+        // message model resolved by addAndSendMsgToChat so callers still get an id.
+        return window.Store.Msg.get(newMsgKey._serialized) || addedMsg;
     };
 	
     window.WWebJS.editMessage = async (msg, content, options = {}) => {
@@ -560,6 +563,15 @@ exports.LoadUtils = () => {
             msg.id = Object.assign({}, msg.id, { remote: msg.id.remote._serialized });
         }
 
+        // Some WhatsApp Web builds serialize MsgKey with the serialized string
+        // under `$1` instead of `_serialized`. Normalize so consumers can always
+        // rely on msg.id._serialized.
+        if (!msg.id._serialized) {
+            msg.id = Object.assign({}, msg.id, {
+                _serialized: msg.id.$1 || message.id?._serialized || [msg.id.fromMe, msg.id.remote, msg.id.id].join('_')
+            });
+        }
+
         delete msg.pendingAckUpdate;
 
         return msg;
@@ -620,8 +632,16 @@ exports.LoadUtils = () => {
 
     window.WWebJS.getChats = async () => {
         const chats = window.Store.Chat.getModelsArray();
-        const chatPromises = chats.map(chat => window.WWebJS.getChatModel(chat));
-        return await Promise.all(chatPromises);
+        // Serialize chats individually so one broken chat (stale group metadata,
+        // missing participants, etc.) doesn't reject the whole list.
+        const chatPromises = chats.map(chat =>
+            window.WWebJS.getChatModel(chat).catch(err => {
+                console.warn(`Skipping chat ${chat?.id?._serialized}: ${err?.message || err}`);
+                return null;
+            })
+        );
+        const models = await Promise.all(chatPromises);
+        return models.filter(Boolean);
     };
 
     window.WWebJS.getChannels = async () => {
@@ -644,12 +664,18 @@ exports.LoadUtils = () => {
 
         if (chat.groupMetadata) {
             model.isGroup = true;
-            const chatWid = window.Store.WidFactory.createWid(chat.id._serialized);
-            const groupMetadata = window.Store.GroupMetadata || window.Store.WAWebGroupMetadataCollection;
-            await groupMetadata.update(chatWid);
-            chat.groupMetadata.participants._models
-                .filter(x => x.id?._serialized?.endsWith('@lid'))
-                .forEach(x => x.contact?.phoneNumber && (x.id = x.contact.phoneNumber));
+            // Metadata refresh is best-effort: it can fail for stale/left groups
+            // and must not prevent the chat from being returned at all.
+            try {
+                const chatWid = window.Store.WidFactory.createWid(chat.id._serialized);
+                const groupMetadata = window.Store.GroupMetadata || window.Store.WAWebGroupMetadataCollection;
+                await groupMetadata.update(chatWid);
+                (chat.groupMetadata.participants?._models || [])
+                    .filter(x => x.id?._serialized?.endsWith('@lid'))
+                    .forEach(x => x.contact?.phoneNumber && (x.id = x.contact.phoneNumber));
+            } catch (err) {
+                console.warn(`Group metadata refresh failed for ${chat.id?._serialized}: ${err?.message || err}`);
+            }
             model.groupMetadata = chat.groupMetadata.serialize();
             model.isReadOnly = chat.groupMetadata.announce;
         }
