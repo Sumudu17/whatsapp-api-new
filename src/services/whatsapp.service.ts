@@ -1,4 +1,5 @@
 import { ApiError } from "../middlewares/error.middleware";
+import { logger } from "../utils/logger";
 import { getClient, initializeClient, destroyClient } from "../whatsapp/client";
 import { getState } from "../whatsapp/state";
 import { toWhatsAppId } from "../utils/format";
@@ -62,15 +63,43 @@ export const getWhatsAppGroups = async (userId: number) => {
   }
 
   const client = getClient(userId);
-  const chats = await client.getChats();
-  return chats
-    .filter((chat: any) => chat.isGroup)
-    .map((chat: any) => ({
-      id: chat.id?._serialized ?? chat.id,
-      groupId: chat.id?._serialized ?? chat.id,
-      name: chat.name ?? chat.formattedTitle ?? "Unnamed Group",
-      participants: chat.participants?.length ?? 0,
-    }));
+
+  // Read groups directly from the WhatsApp Web internal store instead of
+  // client.getChats(): full chat serialization is fragile across WhatsApp Web
+  // updates, while id/name/participant count are stable model properties.
+  const result = await client.pupPage.evaluate(() => {
+    const w = window as any;
+    const chats = w.Store.Chat.getModelsArray();
+    const groups = chats
+      .filter((c: any) => c?.id?.server === "g.us")
+      .map((c: any) => {
+        let participants = 0;
+        try {
+          const p = c.groupMetadata?.participants;
+          participants = p?.getModelsArray?.()?.length ?? p?.length ?? 0;
+        } catch {
+          participants = 0;
+        }
+        return {
+          id: c.id._serialized,
+          name: c.formattedTitle || c.name || c.groupMetadata?.subject || "Unnamed Group",
+          participants,
+        };
+      });
+    return { totalChats: chats.length, groups };
+  });
+
+  logger.info(
+    { userId, totalChats: result.totalChats, groupCount: result.groups.length },
+    "Fetched WhatsApp groups"
+  );
+
+  return result.groups.map((g: any) => ({
+    id: g.id,
+    groupId: g.id,
+    name: g.name,
+    participants: g.participants,
+  }));
 };
 
 const formatMessageDateTime = (unixSeconds: number): string => {
