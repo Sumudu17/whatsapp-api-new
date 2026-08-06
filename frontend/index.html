@@ -84,6 +84,64 @@
           <button id="sendBtn" class="btn btn-primary">Send Message</button>
           <p id="sendResult" class="info hidden"></p>
         </div>
+
+        <div class="card">
+          <h2>Send Poll</h2>
+          <div class="radio-group">
+            <label class="form-check-label">
+              <input type="radio" name="pollDestType" value="individual" checked class="form-check-input" />
+              Individual
+            </label>
+            <label class="form-check-label">
+              <input type="radio" name="pollDestType" value="group" class="form-check-input" />
+              Group
+            </label>
+          </div>
+
+          <div id="pollIndividualSection">
+            <label class="form-label">
+              To (E.164)
+              <input type="text" id="pollToInput" placeholder="+94717177326" class="form-control" />
+            </label>
+          </div>
+
+          <div id="pollGroupSection" class="hidden">
+            <label class="form-label">
+              Group
+              <select id="pollGroupSelect" class="form-select">
+                <option value="">Select group</option>
+              </select>
+            </label>
+            <button id="pollRefreshGroupsBtn" class="btn btn-secondary btn-sm">
+              Refresh Groups
+            </button>
+          </div>
+
+          <label class="form-label">
+            Poll question
+            <input type="text" id="pollQuestionInput" placeholder="What time works for the meeting?" class="form-control" />
+          </label>
+
+          <label class="form-label">Poll options</label>
+          <div id="pollOptionsList"></div>
+          <button id="pollAddOptionBtn" type="button" class="btn btn-secondary btn-sm" style="margin-top: 6px;">
+            + Add option
+          </button>
+
+          <div class="radio-group" style="margin-top: 12px;">
+            <label class="form-check-label">
+              <input type="radio" name="pollAnswerType" value="single" checked class="form-check-input" />
+              Single answer
+            </label>
+            <label class="form-check-label">
+              <input type="radio" name="pollAnswerType" value="multiple" class="form-check-input" />
+              Multiple answers
+            </label>
+          </div>
+
+          <button id="pollSendBtn" class="btn btn-primary" style="margin-top: 12px;">Send Poll</button>
+          <p id="pollSendResult" class="info hidden"></p>
+        </div>
       </section>
         </div>
       </main>

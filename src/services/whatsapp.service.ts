@@ -6,7 +6,7 @@ import { toWhatsAppId } from "../utils/format";
 import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { MessageMedia } = require("../../index.js");
+const { MessageMedia, Poll } = require("../../index.js");
 
 export const initializeWhatsApp = async (
   userId: number,
@@ -371,6 +371,92 @@ export const sendWhatsAppMessageByApiKey = async (params: {
     caption: finalCaption,
     mediaUrl: params.mediaUrl,
     sendMediaAsDocument,
+    messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+    raw: sentMessage,
+  };
+};
+
+export const sendWhatsAppPoll = async (
+  userId: number,
+  to: string | undefined,
+  groupId: string | undefined,
+  question: string,
+  options: string[],
+  allowMultipleAnswers: boolean
+) => {
+  const state = getState(userId);
+  if (state.status !== "READY") {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  const client = getClient(userId);
+
+  if ((to && groupId) || (!to && !groupId)) {
+    throw new ApiError(400, "Either to or groupId is required (not both)");
+  }
+
+  const chatId = to ?? groupId!;
+  const poll = new Poll(question, options, { allowMultipleAnswers });
+
+  let sentMessage: any;
+  try {
+    sentMessage = await client.sendMessage(chatId, poll);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send poll";
+    throw new ApiError(502, "Failed to send poll", { message });
+  }
+
+  return {
+    chatId,
+    messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+    raw: sentMessage,
+  };
+};
+
+export const sendWhatsAppPollByApiKey = async (params: {
+  userId: number;
+  phoneNumber?: string;
+  groupId?: string;
+  question: string;
+  options: string[];
+  allowMultipleAnswers: boolean;
+}) => {
+  const state = getState(params.userId);
+  if (state.status !== "READY") {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  let client: ReturnType<typeof getClient>;
+  try {
+    client = getClient(params.userId);
+  } catch {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  if ((params.phoneNumber && params.groupId) || (!params.phoneNumber && !params.groupId)) {
+    throw new ApiError(400, "Either phoneNumber or groupId is required (not both)");
+  }
+
+  const chatId = params.groupId ?? toWhatsAppId(params.phoneNumber!);
+  const chatType: "direct" | "group" = params.groupId ? "group" : "direct";
+  const poll = new Poll(params.question, params.options, {
+    allowMultipleAnswers: params.allowMultipleAnswers,
+  });
+
+  let sentMessage: any;
+  try {
+    sentMessage = await client.sendMessage(chatId, poll);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send poll";
+    throw new ApiError(502, "Failed to send poll", { message });
+  }
+
+  return {
+    chatType,
+    chatId,
+    question: params.question,
+    options: params.options,
+    allowMultipleAnswers: params.allowMultipleAnswers,
     messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
     raw: sentMessage,
   };

@@ -75,6 +75,62 @@ export const sendByApiKeySchema = z
     path: ["message"],
   });
 
+const pollOptionsSchema = z
+  .array(z.string().trim().min(1, "Poll options cannot be empty").max(100))
+  .min(2, "At least 2 poll options are required")
+  .max(12, "A poll cannot have more than 12 options")
+  .refine(
+    (options) => {
+      const normalized = options.map((o) => o.toLowerCase());
+      return new Set(normalized).size === normalized.length;
+    },
+    { message: "Poll options must be unique" }
+  );
+
+export const sendPollSchema = z
+  .object({
+    to: z
+      .string()
+      .trim()
+      .regex(/^\+\d{8,15}$/, "to must be E.164 format, e.g. +94717177326")
+      .optional(),
+    groupId: z
+      .string()
+      .trim()
+      .regex(/@g\.us$/, "groupId must end with @g.us")
+      .optional(),
+    question: z.string().trim().min(1, "Poll question is required").max(255),
+    options: pollOptionsSchema,
+    allowMultipleAnswers: z.boolean().optional().default(false),
+  })
+  .refine((data) => !!data.to !== !!data.groupId, {
+    message: "Either to or groupId is required (not both)",
+    path: ["to"],
+  });
+
+export const sendPollByApiKeySchema = z
+  .object({
+    userId: z.number().int().positive(),
+    apiKey: z.string().trim().min(16),
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(/^\+\d{8,15}$/, "phoneNumber must be E.164 format, e.g. +94717177326")
+      .optional(),
+    groupId: z
+      .string()
+      .trim()
+      .regex(/@g\.us$/, "groupId must end with @g.us")
+      .optional(),
+    question: z.string().trim().min(1, "Poll question is required").max(255),
+    options: pollOptionsSchema,
+    allowMultipleAnswers: z.boolean().optional().default(false),
+  })
+  .refine((data) => !!data.phoneNumber !== !!data.groupId, {
+    message: "Either phoneNumber or groupId is required (not both)",
+    path: ["phoneNumber"],
+  });
+
 export const statusByApiKeySchema = z.object({
   userId: z.number().int().positive(),
   apiKey: z.string().trim().min(16),
