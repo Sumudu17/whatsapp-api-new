@@ -72,7 +72,7 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - Verify your email OTP at `http://localhost:4000/verify-email?email=...`
 - Forgot password: `http://localhost:4000/forgot-password` → then `http://localhost:4000/reset-password?email=...`
 - After login, open:
-  - `http://localhost:4000/` (dashboard)
+  - `http://localhost:4000/` (dashboard — send messages, send polls, and message-count stats)
   - `http://localhost:4000/connection` (QR + connection status)
   - `http://localhost:4000/api` (API key management)
   - `http://localhost:4000/profile` (name/email/password)
@@ -108,8 +108,10 @@ Schema changes are applied with **Flyway** (Docker), not by the Node app on star
 - `POST /api/whatsapp/status` (**API key** — `userId` + `apiKey`; external client status)
 - `POST /api/whatsapp/messages` (**API key** — `userId` + `apiKey` + XOR `phoneNumber` / `groupId` + optional `limit`; fetch latest messages)
 - `POST /api/whatsapp/send` (session auth or API-key auth; routes through the correct WhatsApp session)
+- `POST /api/whatsapp/send-poll` (session auth or API-key auth; single- or multiple-answer poll to an individual or group)
 - `POST /api/whatsapp/send-api-key` (deprecated alias for API-key send)
 - `POST /api/whatsapp/status-api-key` (deprecated alias for API-key status)
+- `GET /api/whatsapp/message-stats` (session; counts of successfully sent text + poll messages for the logged-in user — "today" and "total")
 
 ### External WhatsApp HTTP API
 
@@ -239,6 +241,75 @@ Response:
 
 Response: `{ "success": true }`
 
+### Poll Payloads
+
+`POST /api/whatsapp/send-poll` — same auth pattern as `/send`: session cookie by default, or pass `apiKey` + `userId` in the body to authenticate with an API key instead. Requires exactly one of `to`/`phoneNumber` (E.164) or `groupId` (`...@g.us`), a `question`, and 2-12 unique non-empty `options`. `allowMultipleAnswers` is optional (default `false`, i.e. single-answer poll).
+
+#### Session auth (dashboard)
+
+Request:
+
+```
+{
+  "to": "+94717177326",
+  "question": "What time works for the meeting?",
+  "options": ["9 AM", "1 PM", "5 PM"],
+  "allowMultipleAnswers": false
+}
+```
+
+Response:
+
+```
+{
+  "success": true,
+  "messageId": "true_94717177326@c.us_3EB0EXAMPLEHASH",
+  "chatId": "94717177326@c.us",
+  "poll": {
+    "question": "What time works for the meeting?",
+    "options": ["9 AM", "1 PM", "5 PM"],
+    "allowMultipleAnswers": false
+  }
+}
+```
+
+#### API key auth (external clients)
+
+Request:
+
+```
+{
+  "userId": 3,
+  "apiKey": "YOUR_API_KEY",
+  "groupId": "1234567890-123456789@g.us",
+  "question": "Which topics should we cover?",
+  "options": ["Budget", "Roadmap", "Hiring"],
+  "allowMultipleAnswers": true
+}
+```
+
+Response:
+
+```
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Poll sent successfully",
+  "data": {
+    "chatType": "group",
+    "chatId": "1234567890-123456789@g.us",
+    "question": "Which topics should we cover?",
+    "options": ["Budget", "Roadmap", "Hiring"],
+    "allowMultipleAnswers": true,
+    "messageId": "true_1234567890-123456789@g.us_3EB0EXAMPLEHASH"
+  },
+  "messageId": "true_1234567890-123456789@g.us_3EB0EXAMPLEHASH",
+  "clientStatus": "READY"
+}
+```
+
+Validation errors (empty question, fewer than 2 options, duplicate options, both/neither `to`/`groupId`, etc.) return `400` with the same Zod-error `details` shape used by `/send`. An unready client returns `503`; an invalid API key returns `401`.
+
 ### WebSocket Events
 - `qr`
 - `ready`
@@ -263,6 +334,12 @@ curl -X POST http://localhost:4000/api/auth/login \
 ```
 
 WhatsApp HTTP API examples (`/api/whatsapp/status`, `/send`, `/messages`): see **`docs/WHATSAPP_API.md`**.
+
+```
+curl -X POST http://localhost:4000/api/whatsapp/send-poll \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":3,\"apiKey\":\"YOUR_API_KEY\",\"phoneNumber\":\"+94717177326\",\"question\":\"Lunch?\",\"options\":[\"Pizza\",\"Burger\"],\"allowMultipleAnswers\":false}"
+```
 
 ```
 curl -X POST http://localhost:4000/api/alerts/test \

@@ -5,8 +5,9 @@ import { getState } from "../whatsapp/state";
 import { toWhatsAppId } from "../utils/format";
 import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
+import { insertMessageLog, getMessageStats, getMessageLogs, MessageLogType } from "../db/messageLogs.repo";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { MessageMedia } = require("../../index.js");
+const { MessageMedia, Poll } = require("../../index.js");
 
 export const initializeWhatsApp = async (
   userId: number,
@@ -54,6 +55,34 @@ export const getWhatsAppConnection = async (userId: number) => {
     lastDisconnectedAt: session?.last_disconnected_at ?? null,
     lastDisconnectedReason: session?.last_disconnected_reason ?? null,
   };
+};
+
+const logSentMessage = (params: {
+  userId: number;
+  messageType: MessageLogType;
+  destination: string;
+  whatsappMessageId: string | null;
+}) => {
+  insertMessageLog({
+    userId: params.userId,
+    clientId: String(params.userId),
+    messageType: params.messageType,
+    destination: params.destination,
+    whatsappMessageId: params.whatsappMessageId,
+  }).catch((err) => {
+    logger.warn({ err, userId: params.userId }, "Failed to record message log");
+  });
+};
+
+export const getWhatsAppMessageStats = (userId: number) => {
+  return getMessageStats(userId);
+};
+
+export const getWhatsAppMessageLogs = (
+  userId: number,
+  params: { limit: number; offset: number }
+) => {
+  return getMessageLogs(userId, params);
 };
 
 export const getWhatsAppGroups = async (userId: number) => {
@@ -280,8 +309,10 @@ export const sendWhatsAppText = async (
   }
 
   const result = await client.sendMessage(destination, message);
+  const messageId = result?.id?._serialized ?? result?.id ?? null;
+  logSentMessage({ userId, messageType: "text", destination, whatsappMessageId: messageId });
   return {
-    messageId: result?.id?._serialized ?? result?.id ?? null,
+    messageId,
     raw: result,
   };
 };
@@ -325,6 +356,8 @@ export const sendWhatsAppMessageByApiKey = async (params: {
       const message = err instanceof Error ? err.message : "Failed to send message";
       throw new ApiError(502, "Failed to send message", { message });
     }
+    const messageId = sentMessage?.id?._serialized ?? sentMessage?.id ?? null;
+    logSentMessage({ userId: params.userId, messageType: "text", destination: chatId, whatsappMessageId: messageId });
     return {
       chatType,
       chatId,
@@ -333,7 +366,7 @@ export const sendWhatsAppMessageByApiKey = async (params: {
       sendMediaAsDocument: false,
       caption: "",
       mediaUrl: null,
-      messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+      messageId,
       raw: sentMessage,
     };
   }
@@ -372,6 +405,98 @@ export const sendWhatsAppMessageByApiKey = async (params: {
     mediaUrl: params.mediaUrl,
     sendMediaAsDocument,
     messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+    raw: sentMessage,
+  };
+};
+
+export const sendWhatsAppPoll = async (
+  userId: number,
+  to: string | undefined,
+  groupId: string | undefined,
+  question: string,
+  options: string[],
+  allowMultipleAnswers: boolean
+) => {
+  const state = getState(userId);
+  if (state.status !== "READY") {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  const client = getClient(userId);
+
+  if ((to && groupId) || (!to && !groupId)) {
+    throw new ApiError(400, "Either to or groupId is required (not both)");
+  }
+
+  const chatId = to ?? groupId!;
+  const poll = new Poll(question, options, { allowMultipleAnswers });
+
+  let sentMessage: any;
+  try {
+    sentMessage = await client.sendMessage(chatId, poll);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send poll";
+    throw new ApiError(502, "Failed to send poll", { message });
+  }
+
+  const messageId = sentMessage?.id?._serialized ?? sentMessage?.id ?? null;
+  logSentMessage({ userId, messageType: "poll", destination: chatId, whatsappMessageId: messageId });
+
+  return {
+    chatId,
+    messageId,
+    raw: sentMessage,
+  };
+};
+
+export const sendWhatsAppPollByApiKey = async (params: {
+  userId: number;
+  phoneNumber?: string;
+  groupId?: string;
+  question: string;
+  options: string[];
+  allowMultipleAnswers: boolean;
+}) => {
+  const state = getState(params.userId);
+  if (state.status !== "READY") {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  let client: ReturnType<typeof getClient>;
+  try {
+    client = getClient(params.userId);
+  } catch {
+    throw new ApiError(503, "WhatsApp client is not ready");
+  }
+
+  if ((params.phoneNumber && params.groupId) || (!params.phoneNumber && !params.groupId)) {
+    throw new ApiError(400, "Either phoneNumber or groupId is required (not both)");
+  }
+
+  const chatId = params.groupId ?? toWhatsAppId(params.phoneNumber!);
+  const chatType: "direct" | "group" = params.groupId ? "group" : "direct";
+  const poll = new Poll(params.question, params.options, {
+    allowMultipleAnswers: params.allowMultipleAnswers,
+  });
+
+  let sentMessage: any;
+  try {
+    sentMessage = await client.sendMessage(chatId, poll);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send poll";
+    throw new ApiError(502, "Failed to send poll", { message });
+  }
+
+  const messageId = sentMessage?.id?._serialized ?? sentMessage?.id ?? null;
+  logSentMessage({ userId: params.userId, messageType: "poll", destination: chatId, whatsappMessageId: messageId });
+
+  return {
+    chatType,
+    chatId,
+    question: params.question,
+    options: params.options,
+    allowMultipleAnswers: params.allowMultipleAnswers,
+    messageId,
     raw: sentMessage,
   };
 };

@@ -118,6 +118,31 @@
                 <h4 style="margin:0 0 6px;">Messages Error Response (Invalid API Key)</h4>
                 <pre id="messagesInvalidKeyResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
               </div>
+
+              <hr />
+              <p style="margin-top:10px;">
+                Poll API endpoint:
+                <code id="endpointPollUrlPost"></code>
+              </p>
+              <p>
+                Use either <code>phoneNumber</code> or <code>groupId</code> (xor). <code>options</code> requires 2-12 unique, non-empty items. <code>allowMultipleAnswers</code> is optional (default <code>false</code>).
+              </p>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Direct Number Poll Example</h4>
+                <pre id="examplePhonePollPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Group Poll Example</h4>
+                <pre id="exampleGroupPollPayloadText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Poll Success Response (example)</h4>
+                <pre id="pollSuccessResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
+              <div style="margin-top:10px;">
+                <h4 style="margin:0 0 6px;">Poll Validation Error Response (example)</h4>
+                <pre id="pollValidationErrorResponseText" style="white-space:pre-wrap; word-break:break-all; margin:0;"></pre>
+              </div>
             </div>
           </div>
 
@@ -227,6 +252,11 @@
       const statusInvalidKeyResponseText = document.getElementById("statusInvalidKeyResponseText");
       const examplePhoneMediaPayloadText = document.getElementById("examplePhoneMediaPayloadText");
       const exampleGroupMediaPayloadText = document.getElementById("exampleGroupMediaPayloadText");
+      const endpointPollUrlPost = document.getElementById("endpointPollUrlPost");
+      const examplePhonePollPayloadText = document.getElementById("examplePhonePollPayloadText");
+      const exampleGroupPollPayloadText = document.getElementById("exampleGroupPollPayloadText");
+      const pollSuccessResponseText = document.getElementById("pollSuccessResponseText");
+      const pollValidationErrorResponseText = document.getElementById("pollValidationErrorResponseText");
 
       let currentUserId = null;
       let lastCreatedRawKey = null;
@@ -240,6 +270,9 @@
       }
       if (endpointStatusUrlPost) {
         endpointStatusUrlPost.textContent = `POST ${origin}/api/whatsapp/status`;
+      }
+      if (endpointPollUrlPost) {
+        endpointPollUrlPost.textContent = `POST ${origin}/api/whatsapp/send-poll`;
       }
 
       const copyToClipboard = async (text) => {
@@ -386,6 +419,45 @@
           groupId: "1234567890-123456789@g.us",
           limit: 20,
         };
+        const phonePollExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          phoneNumber: "+94717177326",
+          question: "What time works for the meeting?",
+          options: ["9 AM", "1 PM", "5 PM"],
+          allowMultipleAnswers: false,
+        };
+        const groupPollExample = {
+          userId: currentUserId,
+          apiKey: keyValue,
+          groupId: "1234567890-123456789@g.us",
+          question: "Which topics should we cover?",
+          options: ["Budget", "Roadmap", "Hiring"],
+          allowMultipleAnswers: true,
+        };
+        const pollSuccessExample = {
+          success: true,
+          statusCode: 200,
+          message: "Poll sent successfully",
+          data: {
+            chatType: "direct",
+            chatId: "94717177326@c.us",
+            question: "What time works for the meeting?",
+            options: ["9 AM", "1 PM", "5 PM"],
+            allowMultipleAnswers: false,
+            messageId: "true_94717177326@c.us_3EB0EXAMPLEHASH",
+          },
+          messageId: "true_94717177326@c.us_3EB0EXAMPLEHASH",
+          clientStatus: "READY",
+        };
+        const pollValidationErrorExample = {
+          success: false,
+          error: "Validation error",
+          details: {
+            _errors: [],
+            options: { _errors: ["At least 2 poll options are required"] },
+          },
+        };
         const messagesSuccessExample = {
           success: true,
           statusCode: 200,
@@ -434,6 +506,18 @@
         exampleMessagesGroupPayloadText.textContent = JSON.stringify(messagesGroupExample, null, 2);
         messagesSuccessResponseText.textContent = JSON.stringify(messagesSuccessExample, null, 2);
         messagesInvalidKeyResponseText.textContent = JSON.stringify(statusInvalidApiKeyExample, null, 2);
+        if (examplePhonePollPayloadText) {
+          examplePhonePollPayloadText.textContent = JSON.stringify(phonePollExample, null, 2);
+        }
+        if (exampleGroupPollPayloadText) {
+          exampleGroupPollPayloadText.textContent = JSON.stringify(groupPollExample, null, 2);
+        }
+        if (pollSuccessResponseText) {
+          pollSuccessResponseText.textContent = JSON.stringify(pollSuccessExample, null, 2);
+        }
+        if (pollValidationErrorResponseText) {
+          pollValidationErrorResponseText.textContent = JSON.stringify(pollValidationErrorExample, null, 2);
+        }
         apiDetailsBox.classList.remove("hidden");
       };
 

@@ -9,6 +9,10 @@ import {
   initialize,
   logout,
   send,
+  sendPoll,
+  sendPollByApiKey,
+  messageStats,
+  messageLogs,
 } from "../controllers/whatsapp.controller";
 import { requireAuth } from "../middlewares/auth.middleware";
 import { rateLimitSend } from "../middlewares/rateLimit.middleware";
@@ -16,6 +20,8 @@ import { validateBody } from "../middlewares/validate.middleware";
 import {
   sendByApiKeySchema,
   sendSchema,
+  sendPollSchema,
+  sendPollByApiKeySchema,
   statusByApiKeySchema,
   fetchMessagesByApiKeySchema,
 } from "../utils/validators";
@@ -31,6 +37,8 @@ router.get("/dashboard-status", requireAuth, dashboardStatus);
 router.post("/status", validateBody(statusByApiKeySchema), statusByApiKey);
 router.post("/messages", validateBody(fetchMessagesByApiKeySchema), messagesByApiKey);
 router.get("/groups", requireAuth, groups);
+router.get("/message-stats", requireAuth, messageStats);
+router.get("/message-logs", requireAuth, messageLogs);
 
 // Unified send endpoint:
 // - If `apiKey` exists in the request body -> API key auth
@@ -49,5 +57,17 @@ router.post("/send", requireAuth, rateLimitSend, validateBody(sendSchema), send)
 // Backwards-compatible alias (deprecated): keep for older clients
 router.post("/send-api-key", validateBody(sendByApiKeySchema), sendByApiKey);
 router.post("/status-api-key", validateBody(statusByApiKeySchema), statusByApiKey);
+
+// Unified send-poll endpoint: same apiKey-vs-session branching as /send
+router.post(
+  "/send-poll",
+  (req, _res, next) => {
+    if ((req.body as any)?.apiKey !== undefined) return next();
+    return next("route");
+  },
+  validateBody(sendPollByApiKeySchema),
+  sendPollByApiKey
+);
+router.post("/send-poll", requireAuth, rateLimitSend, validateBody(sendPollSchema), sendPoll);
 
 export default router;
