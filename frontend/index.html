@@ -20,7 +20,24 @@
         </div>
       </header>
 
-      <section class="grid">
+      <div class="row g-4">
+        <div class="col-12 col-sm-6">
+        <div class="card">
+          <h2>Messages Sent Today</h2>
+          <p class="display-4 fw-bold text-primary mb-0" id="messagesTodayValue">-</p>
+        </div>
+        </div>
+
+        <div class="col-12 col-sm-6">
+        <div class="card">
+          <h2>Total Messages Sent</h2>
+          <p class="display-4 fw-bold text-primary mb-0" id="messagesTotalValue">-</p>
+        </div>
+        </div>
+      </div>
+
+      <div class="row g-4 mt-4">
+        <div class="col-12 col-sm-6 col-lg-4">
         <div class="card">
           <h2>Connection</h2>
           <p id="serverStatus" class="status-note hidden">
@@ -44,7 +61,9 @@
             <p id="qrHint">QR will appear here when required.</p>
           </div>
         </div>
+        </div>
 
+        <div class="col-12 col-sm-6 col-lg-4">
         <div class="card">
           <h2>Send Message</h2>
           <div class="radio-group">
@@ -84,7 +103,9 @@
           <button id="sendBtn" class="btn btn-primary">Send Message</button>
           <p id="sendResult" class="info hidden"></p>
         </div>
+        </div>
 
+        <div class="col-12 col-sm-6 col-lg-4">
         <div class="card">
           <h2>Send Poll</h2>
           <div class="radio-group">
@@ -142,7 +163,8 @@
           <button id="pollSendBtn" class="btn btn-primary" style="margin-top: 12px;">Send Poll</button>
           <p id="pollSendResult" class="info hidden"></p>
         </div>
-      </section>
+        </div>
+      </div>
         </div>
       </main>
       <div id="footerMount"></div>

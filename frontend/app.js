@@ -28,6 +28,9 @@ const pollSendBtn = document.getElementById("pollSendBtn");
 const pollSendResult = document.getElementById("pollSendResult");
 const pollDestRadios = document.querySelectorAll("input[name=\"pollDestType\"]");
 
+const messagesTodayValue = document.getElementById("messagesTodayValue");
+const messagesTotalValue = document.getElementById("messagesTotalValue");
+
 const socket = io({ withCredentials: true });
 let socketConnected = false;
 
@@ -160,6 +163,12 @@ waLogoutBtn.addEventListener("click", async () => {
   }
 });
 
+const loadMessageStats = async () => {
+  const data = await request("/api/whatsapp/message-stats");
+  if (messagesTodayValue) messagesTodayValue.textContent = data.stats?.today ?? 0;
+  if (messagesTotalValue) messagesTotalValue.textContent = data.stats?.total ?? 0;
+};
+
 const populateGroupSelect = (selectEl, groupsData) => {
   selectEl.innerHTML = "<option value=\"\">Select group</option>";
   groupsData.forEach((group) => {
@@ -213,6 +222,7 @@ sendBtn.addEventListener("click", async () => {
     });
     sendResult.textContent = `Message sent. ID: ${data.messageId || "N/A"}`;
     sendResult.classList.remove("hidden");
+    loadMessageStats().catch(() => {});
   } catch (err) {
     sendResult.textContent = err.message;
     sendResult.classList.remove("hidden");
@@ -362,6 +372,7 @@ pollSendBtn.addEventListener("click", async () => {
       body: JSON.stringify(payload),
     });
     showPollResult(`Poll sent. ID: ${data.messageId || "N/A"}`, false);
+    loadMessageStats().catch(() => {});
   } catch (err) {
     showPollResult(err.message, true);
   } finally {
@@ -388,6 +399,12 @@ pollSendBtn.addEventListener("click", async () => {
     }
   } catch (err) {
     console.warn("Failed to load WhatsApp status:", err);
+  }
+
+  try {
+    await loadMessageStats();
+  } catch (err) {
+    console.warn("Failed to load message stats:", err);
   }
 })();
 

@@ -10,6 +10,7 @@ import {
   sendWhatsAppPoll,
   sendWhatsAppPollByApiKey,
   fetchLatestChatMessagesByApiKey,
+  getWhatsAppMessageStats,
 } from "../services/whatsapp.service";
 import { toWhatsAppId } from "../utils/format";
 import { ApiError } from "../middlewares/error.middleware";
@@ -70,6 +71,16 @@ export const dashboardStatus = async (req: Request, res: Response, next: NextFun
     const userId = getSessionUserId(req);
     const connection = await getWhatsAppConnection(userId);
     return res.json({ success: true, connection });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const messageStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getSessionUserId(req);
+    const stats = await getWhatsAppMessageStats(userId);
+    res.json({ success: true, stats });
   } catch (err) {
     next(err);
   }

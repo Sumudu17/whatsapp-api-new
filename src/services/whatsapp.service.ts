@@ -5,6 +5,7 @@ import { getState } from "../whatsapp/state";
 import { toWhatsAppId } from "../utils/format";
 import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
+import { insertMessageLog, getMessageStats, MessageLogType } from "../db/messageLogs.repo";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { MessageMedia, Poll } = require("../../index.js");
 
@@ -54,6 +55,27 @@ export const getWhatsAppConnection = async (userId: number) => {
     lastDisconnectedAt: session?.last_disconnected_at ?? null,
     lastDisconnectedReason: session?.last_disconnected_reason ?? null,
   };
+};
+
+const logSentMessage = (params: {
+  userId: number;
+  messageType: MessageLogType;
+  destination: string;
+  whatsappMessageId: string | null;
+}) => {
+  insertMessageLog({
+    userId: params.userId,
+    clientId: String(params.userId),
+    messageType: params.messageType,
+    destination: params.destination,
+    whatsappMessageId: params.whatsappMessageId,
+  }).catch((err) => {
+    logger.warn({ err, userId: params.userId }, "Failed to record message log");
+  });
+};
+
+export const getWhatsAppMessageStats = (userId: number) => {
+  return getMessageStats(userId);
 };
 
 export const getWhatsAppGroups = async (userId: number) => {
@@ -280,8 +302,10 @@ export const sendWhatsAppText = async (
   }
 
   const result = await client.sendMessage(destination, message);
+  const messageId = result?.id?._serialized ?? result?.id ?? null;
+  logSentMessage({ userId, messageType: "text", destination, whatsappMessageId: messageId });
   return {
-    messageId: result?.id?._serialized ?? result?.id ?? null,
+    messageId,
     raw: result,
   };
 };
@@ -325,6 +349,8 @@ export const sendWhatsAppMessageByApiKey = async (params: {
       const message = err instanceof Error ? err.message : "Failed to send message";
       throw new ApiError(502, "Failed to send message", { message });
     }
+    const messageId = sentMessage?.id?._serialized ?? sentMessage?.id ?? null;
+    logSentMessage({ userId: params.userId, messageType: "text", destination: chatId, whatsappMessageId: messageId });
     return {
       chatType,
       chatId,
@@ -333,7 +359,7 @@ export const sendWhatsAppMessageByApiKey = async (params: {
       sendMediaAsDocument: false,
       caption: "",
       mediaUrl: null,
-      messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+      messageId,
       raw: sentMessage,
     };
   }
@@ -406,9 +432,12 @@ export const sendWhatsAppPoll = async (
     throw new ApiError(502, "Failed to send poll", { message });
   }
 
+  const messageId = sentMessage?.id?._serialized ?? sentMessage?.id ?? null;
+  logSentMessage({ userId, messageType: "poll", destination: chatId, whatsappMessageId: messageId });
+
   return {
     chatId,
-    messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+    messageId,
     raw: sentMessage,
   };
 };
@@ -451,13 +480,16 @@ export const sendWhatsAppPollByApiKey = async (params: {
     throw new ApiError(502, "Failed to send poll", { message });
   }
 
+  const messageId = sentMessage?.id?._serialized ?? sentMessage?.id ?? null;
+  logSentMessage({ userId: params.userId, messageType: "poll", destination: chatId, whatsappMessageId: messageId });
+
   return {
     chatType,
     chatId,
     question: params.question,
     options: params.options,
     allowMultipleAnswers: params.allowMultipleAnswers,
-    messageId: sentMessage?.id?._serialized ?? sentMessage?.id ?? null,
+    messageId,
     raw: sentMessage,
   };
 };
