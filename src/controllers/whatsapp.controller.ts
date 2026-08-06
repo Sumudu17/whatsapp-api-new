@@ -11,6 +11,7 @@ import {
   sendWhatsAppPollByApiKey,
   fetchLatestChatMessagesByApiKey,
   getWhatsAppMessageStats,
+  getWhatsAppMessageLogs,
 } from "../services/whatsapp.service";
 import { toWhatsAppId } from "../utils/format";
 import { ApiError } from "../middlewares/error.middleware";
@@ -81,6 +82,29 @@ export const messageStats = async (req: Request, res: Response, next: NextFuncti
     const userId = getSessionUserId(req);
     const stats = await getWhatsAppMessageStats(userId);
     res.json({ success: true, stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const messageLogs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getSessionUserId(req);
+
+    const pageRaw = Number(req.query.page);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    const { logs, total } = await getWhatsAppMessageLogs(userId, { limit, offset });
+    res.json({
+      success: true,
+      logs,
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
   } catch (err) {
     next(err);
   }

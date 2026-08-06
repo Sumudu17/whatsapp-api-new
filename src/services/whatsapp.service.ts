@@ -5,7 +5,7 @@ import { getState } from "../whatsapp/state";
 import { toWhatsAppId } from "../utils/format";
 import { getWhatsappSessionByUserId } from "../db/whatsapp.repo";
 import { ensureWhatsappSessionRow } from "../db/whatsapp.repo";
-import { insertMessageLog, getMessageStats, MessageLogType } from "../db/messageLogs.repo";
+import { insertMessageLog, getMessageStats, getMessageLogs, MessageLogType } from "../db/messageLogs.repo";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { MessageMedia, Poll } = require("../../index.js");
 
@@ -76,6 +76,13 @@ const logSentMessage = (params: {
 
 export const getWhatsAppMessageStats = (userId: number) => {
   return getMessageStats(userId);
+};
+
+export const getWhatsAppMessageLogs = (
+  userId: number,
+  params: { limit: number; offset: number }
+) => {
+  return getMessageLogs(userId, params);
 };
 
 export const getWhatsAppGroups = async (userId: number) => {

@@ -163,6 +163,10 @@ export const createApp = (sessionMiddleware: RequestHandler) => {
     res.sendFile(path.join(frontendPath, "admin.html"));
   });
 
+  app.get("/message-logs", (_req, res) => {
+    res.sendFile(path.join(frontendPath, "message-logs.html"));
+  });
+
   app.get("/", (req, res) => {
     const sessionData: any = (req as any).session;
     if (!sessionData?.user) {

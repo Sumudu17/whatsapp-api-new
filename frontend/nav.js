@@ -17,11 +17,12 @@
   const baseAppItems = [
     { href: "/", label: "Dashboard", key: "dashboard" },
     { href: "/connection", label: "Connection", key: "connection" },
+    { href: "/message-logs", label: "Message Logs", key: "message-logs" },
     { href: "/api", label: "API", key: "api" },
     { href: "/profile", label: "Profile", key: "profile" },
   ];
 
-  const appPages = ["dashboard", "connection", "api", "profile", "admin"];
+  const appPages = ["dashboard", "connection", "message-logs", "api", "profile", "admin"];
 
   const navLinkClass = (key) => {
     const active = page === key ? " active" : "";

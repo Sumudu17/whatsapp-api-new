@@ -12,6 +12,7 @@ import {
   sendPoll,
   sendPollByApiKey,
   messageStats,
+  messageLogs,
 } from "../controllers/whatsapp.controller";
 import { requireAuth } from "../middlewares/auth.middleware";
 import { rateLimitSend } from "../middlewares/rateLimit.middleware";
@@ -37,6 +38,7 @@ router.post("/status", validateBody(statusByApiKeySchema), statusByApiKey);
 router.post("/messages", validateBody(fetchMessagesByApiKeySchema), messagesByApiKey);
 router.get("/groups", requireAuth, groups);
 router.get("/message-stats", requireAuth, messageStats);
+router.get("/message-logs", requireAuth, messageLogs);
 
 // Unified send endpoint:
 // - If `apiKey` exists in the request body -> API key auth
