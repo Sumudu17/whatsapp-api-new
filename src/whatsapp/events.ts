@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { getIo } from "../sockets";
 import { logger } from "../utils/logger";
-import { getState, setClientInfo, setLastError, setQrDataUrl, setStatus } from "./state";
+import { getState, setClientInfo, setClientState, setLastError, setQrDataUrl, setStatus } from "./state";
 import { updateWhatsappSessionStatus } from "../db/whatsapp.repo";
 import { notifyWhatsAppDisconnect } from "../services/notification.service";
 
@@ -109,9 +109,7 @@ export const attachClientEvents = (userId: number, client: any) => {
   });
 
   client.on("change_state", (state: string) => {
-    safeEmitToUser(userId, "state_change", {
-      ...getState(userId),
-      clientState: state,
-    });
+    setClientState(userId, state);
+    safeEmitToUser(userId, "state_change", getState(userId));
   });
 };
