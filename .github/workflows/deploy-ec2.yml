@@ -96,7 +96,9 @@ jobs:
             echo "🔄 Updating installed npm packages..."
             # NOTE: this can modify node_modules based on semver ranges in package-lock.json.
             # If you prefer fully deterministic deploys, remove this step and rely on `npm ci`.
-            npm update --omit=dev --no-audit --no-fund || echo "⚠️ npm update failed, continuing anyway..."
+            # --omit=dev is intentionally NOT used here: devDependencies (e.g. @types/*) must
+            # stay installed through the `npm run build` step below, or tsc fails to resolve them.
+            npm update --no-audit --no-fund || echo "⚠️ npm update failed, continuing anyway..."
 
             echo "🔨 Building TypeScript..."
             npm run build || echo "⚠️ Build failed, continuing anyway..."
