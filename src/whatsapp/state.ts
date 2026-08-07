@@ -18,6 +18,8 @@ export type WhatsAppState = {
   lastError?: string;
   /** Set when status is READY (from client.info) */
   clientInfo?: ClientInfo;
+  /** Last value seen from the client's "change_state" event */
+  clientState?: string;
 };
 
 const stateByUserId = new Map<number, WhatsAppState>();
@@ -50,6 +52,14 @@ export const setStatus = (userId: number, status: WhatsAppStatus) => {
   if (status !== "READY") {
     state.clientInfo = undefined;
   }
+  if (status !== "DISCONNECTED") {
+    state.lastError = undefined;
+  }
+};
+
+export const setClientState = (userId: number, clientState: string) => {
+  const state = getOrCreateState(userId);
+  state.clientState = clientState;
 };
 
 export const setClientInfo = (userId: number, info: ClientInfo) => {
