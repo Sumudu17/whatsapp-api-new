@@ -3,7 +3,7 @@ name: Deploy WhatsApp API
 on:
   push:
     branches:
-      - add-whatsapp-media-message-support
+      - feature/add-whatsapp-media-message-support
       - main
 
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
 
   deploy-testing:
     name: Deploy to Contabo Testing
-    if: github.ref == 'refs/heads/add-whatsapp-media-message-support'
+    if: github.ref == 'refs/heads/feature/add-whatsapp-media-message-support'
     runs-on: ubuntu-latest
 
     environment:
@@ -46,7 +46,7 @@ jobs:
             set -euo pipefail
 
             PROJECT_PATH="${{ secrets.PROJECT_PATH }}"
-            DEPLOY_BRANCH="add-whatsapp-media-message-support"
+            DEPLOY_BRANCH="feature/add-whatsapp-media-message-support"
 
             echo "=========================================="
             echo "🧪 TESTING DEPLOYMENT"
