@@ -47,6 +47,7 @@ jobs:
 
             PROJECT_PATH="${{ secrets.PROJECT_PATH }}"
             DEPLOY_BRANCH="feature/add-whatsapp-media-message-support"
+            PASSWORD="${{ secrets.PASSWORD }}"
 
             echo "=========================================="
             echo "🧪 TESTING DEPLOYMENT"
@@ -104,10 +105,9 @@ jobs:
             if ! command -v node >/dev/null 2>&1; then
               echo "⚠️ Node.js not found. Installing Node.js 18.x..."
 
-              curl -fsSL https://deb.nodesource.com/setup_18.x | \
-                sudo -E bash -
+              echo "$PASSWORD" | sudo -S -E bash -c "$(curl -fsSL https://deb.nodesource.com/setup_18.x)"
 
-              sudo apt-get install -y nodejs
+              echo "$PASSWORD" | sudo -S apt-get install -y nodejs
             fi
 
             echo "✅ Node: $(node --version)"
@@ -120,9 +120,9 @@ jobs:
 
             echo "🔧 Installing Chrome dependencies for Puppeteer..."
 
-            sudo apt-get update
+            echo "$PASSWORD" | sudo -S apt-get update
 
-            sudo apt-get install -y \
+            echo "$PASSWORD" | sudo -S apt-get install -y \
               libcups2t64 \
               libasound2t64 \
               libnss3 \
@@ -140,7 +140,7 @@ jobs:
               fonts-liberation \
               xdg-utils \
               ca-certificates || \
-            sudo apt-get install -y \
+            echo "$PASSWORD" | sudo -S apt-get install -y \
               ca-certificates \
               fonts-liberation \
               libappindicator3-1 \
@@ -234,15 +234,15 @@ jobs:
             if ! command -v docker >/dev/null 2>&1; then
               echo "⚠️ Docker not found. Installing Docker..."
 
-              sudo apt-get update
-              sudo apt-get install -y docker.io
+              echo "$PASSWORD" | sudo -S apt-get update
+              echo "$PASSWORD" | sudo -S apt-get install -y docker.io
 
-              sudo systemctl enable --now docker
+              echo "$PASSWORD" | sudo -S systemctl enable --now docker
             fi
 
-            if ! sudo systemctl is-active --quiet docker; then
+            if ! echo "$PASSWORD" | sudo -S systemctl is-active --quiet docker; then
               echo "🔄 Starting Docker..."
-              sudo systemctl start docker
+              echo "$PASSWORD" | sudo -S systemctl start docker
             fi
 
 
@@ -253,13 +253,13 @@ jobs:
             if [ -f "$PROJECT_PATH/run-flyway.sh" ]; then
 
               echo "🔧 Making run-flyway.sh executable..."
-              sudo chmod +x "$PROJECT_PATH/run-flyway.sh"
+              echo "$PASSWORD" | sudo -S chmod +x "$PROJECT_PATH/run-flyway.sh"
 
               echo "🗄️ Running TEST database migrations..."
-              sudo bash "$PROJECT_PATH/run-flyway.sh" migrate
+              echo "$PASSWORD" | sudo -S bash "$PROJECT_PATH/run-flyway.sh" migrate
 
               echo "📊 Flyway migration status..."
-              sudo bash "$PROJECT_PATH/run-flyway.sh" info
+              echo "$PASSWORD" | sudo -S bash "$PROJECT_PATH/run-flyway.sh" info
 
             else
               echo "❌ run-flyway.sh not found:"
@@ -274,15 +274,15 @@ jobs:
 
             echo "🔄 Restarting Testing application..."
 
-            sudo systemctl daemon-reload
+            echo "$PASSWORD" | sudo -S systemctl daemon-reload
 
-            sudo systemctl enable wa-api-3004 || true
+            echo "$PASSWORD" | sudo -S systemctl enable wa-api-3004 || true
 
-            sudo systemctl restart wa-api-3004
+            echo "$PASSWORD" | sudo -S systemctl restart wa-api-3004
 
             echo "📊 Testing service status:"
 
-            sudo systemctl status wa-api-3004 \
+            echo "$PASSWORD" | sudo -S systemctl status wa-api-3004 \
               --no-pager \
               --lines=20
 
