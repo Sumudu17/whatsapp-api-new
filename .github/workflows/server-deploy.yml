@@ -1,3 +1,19 @@
+# ============================================================
+# Secrets required
+# ------------------------------------------------------------
+# Testing environment (Contabo, deploy-testing job):
+#   HOST, USER, SSH_KEY, PORT (optional), PROJECT_PATH,
+#   PASSWORD  -- the sudo password for USER on the Contabo
+#               server. thingsnode does not have passwordless
+#               sudo configured, so every sudo call in the
+#               Testing job is run as `echo "$PASSWORD" | sudo -S ...`
+#               so it can run non-interactively over SSH.
+#
+# Production environment (AWS, deploy-production job):
+#   HOST, USER, SSH_KEY, PORT (optional), PROJECT_PATH
+#   No PASSWORD secret needed -- sudo runs passwordless there.
+# ============================================================
+
 name: Deploy WhatsApp API
 
 on:
