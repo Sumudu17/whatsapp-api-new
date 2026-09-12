@@ -11,6 +11,51 @@ const wwebjs = require("../../index.js");
 const clientByUserId = new Map<number, any>();
 const initializingByUserId = new Map<number, Promise<any>>();
 const lastClientActivityByUserId = new Map<number, number>();
+const reconnectTimerByUserId = new Map<number, NodeJS.Timeout>();
+
+const clearReconnectTimer = (userId: number) => {
+  const timer = reconnectTimerByUserId.get(userId);
+  if (timer) {
+    clearTimeout(timer);
+    reconnectTimerByUserId.delete(userId);
+  }
+};
+
+/**
+ * WhatsApp Web itself destroys the puppeteer browser whenever the connection
+ * state leaves the "healthy" set (see Client.js onAppStateChangedEvent) or the
+ * account is logged out (post_logout=1 navigation). Neither path calls back
+ * into this module, so without this handler `clientByUserId` keeps pointing at
+ * an already-destroyed client and nothing ever re-initializes it.
+ *
+ * "LOGOUT" means WhatsApp itself invalidated the session (LocalAuth already
+ * deleted the session files at this point) - a fresh QR scan is required, so
+ * we do not auto-reconnect for that reason. Any other reason (network drop,
+ * WA state conflict, timeout, etc.) is treated as transient and gets exactly
+ * one bounded, delayed reconnect attempt reusing the existing session.
+ */
+const scheduleReconnect = (userId: number, reason: string) => {
+  clientByUserId.delete(userId);
+
+  if (reason === "LOGOUT") {
+    clearReconnectTimer(userId);
+    return;
+  }
+
+  if (reconnectTimerByUserId.has(userId)) {
+    return;
+  }
+
+  const delayMs = getInitRetryDelayMs();
+  const timer = setTimeout(() => {
+    reconnectTimerByUserId.delete(userId);
+    logger.info({ userId, reason }, "Attempting automatic WhatsApp reconnect after disconnect");
+    initializeClient(userId, false, false).catch((err) => {
+      logger.warn({ err, userId, reason }, "Automatic WhatsApp reconnect failed");
+    });
+  }, delayMs);
+  reconnectTimerByUserId.set(userId, timer);
+};
 
 const getSessionDirForUser = (userId: number) => {
   const clientId = String(userId);
@@ -121,6 +166,10 @@ export const initializeClient = async (
   force = false,
   clearSession = false
 ) => {
+  // A manual/explicit initialize call supersedes any pending automatic
+  // reconnect attempt for this user.
+  clearReconnectTimer(userId);
+
   const existingInitializing = initializingByUserId.get(userId);
   if (existingInitializing && !force) {
     return existingInitializing;
@@ -201,6 +250,7 @@ export const initializeClient = async (
         const client = buildClient(userId);
         activeClient = client;
         attachClientEvents(userId, client);
+        client.on("disconnected", (reason: string) => scheduleReconnect(userId, reason));
         clientByUserId.set(userId, client);
         await client.initialize();
         // Wait until QR/READY/Auth event has fired for this user.
@@ -253,6 +303,8 @@ export const getClient = (userId: number) => {
 };
 
 export const destroyClient = async (userId: number, logout = false) => {
+  clearReconnectTimer(userId);
+
   const clientInstance = clientByUserId.get(userId);
   if (!clientInstance) {
     return;
@@ -280,4 +332,16 @@ export const destroyClient = async (userId: number, logout = false) => {
 
   setStatus(userId, "DISCONNECTED");
   updateWhatsappSessionStatus(userId, { status: "DISCONNECTED", lastDisconnectedAt: new Date() }).catch(() => {});
+};
+
+/**
+ * Cleanly close every active WhatsApp client's browser (no logout - the
+ * LocalAuth session files are left intact for the next start). Intended for
+ * use on process shutdown (SIGINT/SIGTERM) so Chromium isn't left running as
+ * an orphaned process holding the profile lock, which otherwise forces the
+ * next startup to fall back on clearing stale Singleton lock files.
+ */
+export const destroyAllClients = async () => {
+  const userIds = Array.from(clientByUserId.keys());
+  await Promise.all(userIds.map((userId) => destroyClient(userId, false)));
 };
